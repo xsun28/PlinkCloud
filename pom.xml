@@ -48,7 +48,7 @@
               <goal>java</goal>
             </goals>
                <configuration>
-          <mainClass>plinkcloud.src.main.java.edu.emory.plinkcloud.plinkcloud.TabixBased.TabixReader</mainClass>
+          <mainClass>edu.emory.plinkcloud.plinkcloud.TabixBased.TabixReader</mainClass>
           <arguments>
             <argument>/home/ec2-user/data_93/bgzip/1.vcf.gz</argument>
             <argument>chr1:10000-50000</argument>
