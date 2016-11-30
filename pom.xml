@@ -21,5 +21,20 @@
       <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
+    	<dependency>
+			<groupId>nexus</groupId>
+			<artifactId>samtools</artifactId>
+			<version>1.110</version>
+		</dependency>
+    
   </dependencies>
+  <repositories>
+	<repository>
+			<id>nexus</id>
+			<url>http://34.192.118.190:8081/repository/plinkcloud/</url>
+		</repository>
+	
+	</repositories>
+  
+  
 </project>
