@@ -18,6 +18,8 @@ public class TabixBasedJoin {
 	public TabixBasedJoin(String input, String OutputFile){
 		File dir=new File(input);
 		String[] fileNames=dir.list();
+		String context=dir.getAbsolutePath()+"/";
+
 		ArrayList<String> nameList = new ArrayList<String>(Arrays.asList(fileNames));
 		Collections.sort(nameList,new Comparator<String>(){
 			public int compare(String name1,String name2){
@@ -30,7 +32,7 @@ public class TabixBasedJoin {
 		try{
 			ArrayList<TabixReader> readerList=new ArrayList<TabixReader>();
 			for(String name:nameList)
-				readerList.add(new TabixReader(name));
+				readerList.add(new TabixReader(context+name));
 			this.readerArray=new TabixReader[readerList.size()];
 			this.readerArray=readerList.toArray(readerArray);// Change to array for more efficient access
 			this.pw= new PrintWriter( new BufferedWriter(new FileWriter(OutputFile)));
