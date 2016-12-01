@@ -9,9 +9,11 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.StringTokenizer;
 import java.util.TreeSet;
@@ -31,58 +33,59 @@ public class TabixBasedJoin {
 	private TabixReader[] readerArray;
 	private PrintWriter pw=null;
 	protected final Logger logger = LoggerFactory.getLogger(getClass());  
-	private ConcurrentSkipListSet<Pos> posSet;
+	private ConcurrentSkipListSet<BitSet> posSet;
 	private ExecutorService threadPool;
-	class Pos implements Comparable<Pos>{
-		String chr;
-		int seq;
-		public Pos(String chr, int seq){
-			this.chr=chr;
-			this.seq=seq;
-		}
-		@Override
-		public int compareTo(Pos second){
-			if(!this.chr.toLowerCase().equals(second.chr.toLowerCase())){
-				int chrnum1, chrnum2;
-				switch (chr.toLowerCase()) {
-				case "m":
-					chrnum1 = 25; break;
-				case "x":
-					chrnum1 = 23; break;
-				case "y":
-					chrnum1 = 24; break;
-
-				default:
-					chrnum1 = Integer.parseInt(chr);
-					break;
-				}
-				
-				switch (second.chr.toLowerCase()) {
-				case "m":
-					chrnum2 = 25; break;
-				case "x":
-					chrnum2 = 23; break;
-				case "y":
-					chrnum2 = 24; break;
-
-				default:
-					chrnum2 = Integer.parseInt(second.chr);
-					break;
-				}
-				return chrnum1-chrnum2;
-			}
-			else{
-				return this.seq-second.seq;
-			}
-		}
-		public String getChr(){
-			return chr;
-		}
-		
-		public int getSeq(){
-			return seq;
-		}
-	}
+	private String outputDir;
+//	class Pos implements Comparable<Pos>{
+//		String chr;
+//		int seq;
+//		public Pos(String chr, int seq){
+//			this.chr=chr;
+//			this.seq=seq;
+//		}
+//		@Override
+//		public int compareTo(Pos second){
+//			if(!this.chr.toLowerCase().equals(second.chr.toLowerCase())){
+//				int chrnum1, chrnum2;
+//				switch (chr.toLowerCase()) {
+//				case "m":
+//					chrnum1 = 25; break;
+//				case "x":
+//					chrnum1 = 23; break;
+//				case "y":
+//					chrnum1 = 24; break;
+//
+//				default:
+//					chrnum1 = Integer.parseInt(chr);
+//					break;
+//				}
+//				
+//				switch (second.chr.toLowerCase()) {
+//				case "m":
+//					chrnum2 = 25; break;
+//				case "x":
+//					chrnum2 = 23; break;
+//				case "y":
+//					chrnum2 = 24; break;
+//
+//				default:
+//					chrnum2 = Integer.parseInt(second.chr);
+//					break;
+//				}
+//				return chrnum1-chrnum2;
+//			}
+//			else{
+//				return this.seq-second.seq;
+//			}
+//		}
+//		public String getChr(){
+//			return chr;
+//		}
+//		
+//		public int getSeq(){
+//			return seq;
+//		}
+//	}
 	
 	class paraReader implements Callable<Integer>{
 		private TabixReader treader;
@@ -115,10 +118,12 @@ public class TabixBasedJoin {
 				}
 				else{
 					String[] fields = line.split("\\s");
-					String chr =  parseChr(fields[0]) ;
-					int seq = Integer.parseInt(fields[1]);
-					Pos pos = new Pos(chr, seq);
-					posSet.add(pos);
+					int chr =  parseChr(fields[0].trim()) ;
+					int seq = Integer.parseInt(fields[1].trim());
+					BitSet bs = new BitSet(37);
+					bs = setBits(bs, chr,seq);
+//					Pos pos = new Pos(chr, seq);
+					posSet.add(bs);
 //					if(logger.isDebugEnabled()){
 //						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
 //					}
@@ -129,8 +134,28 @@ public class TabixBasedJoin {
 				
 			}
 		}
+	}
 		
-		private String parseChr(String input) throws Exception{
+		public BitSet setBits(BitSet bs, int chr, int seq){
+			int remain = chr;
+			for (int i=3;i>=0;i--){
+				if(remain==0) break;
+				int residual = remain%2;
+				remain = remain/2;				
+				if(residual==1) bs.set(i);				
+			}
+			
+			remain = seq;
+			for(int i=36;i>=4;i--){
+				if(remain==0) break;
+				int residual = remain%2;
+				remain = remain/2;
+				if(residual==1) bs.set(i);
+			}
+			return bs;
+		}
+		
+		private int parseChr(String input) throws Exception{
 			
 			Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
 			Matcher matcher = pattern.matcher(input);
@@ -138,17 +163,49 @@ public class TabixBasedJoin {
 				int start = matcher.start();
 				int end = matcher.end();
 				String chr = input.substring(start,end);
-				return chr;
+				int chrnum;
+				switch (chr.toLowerCase()) {
+				case "m":
+					chrnum = 25; break;
+				case "x":
+					chrnum = 23; break;
+				case "y":
+					chrnum = 24; break;
+
+				default:
+					chrnum = Integer.parseInt(chr);
+					break;
+				}
+				return chrnum;
 			}
 			else{
 				throw new Exception("Chromosome can't be parsed");
 			}
 			
 		}
-	}
 	
-	public TabixBasedJoin(String input, String OutputFile){
-		posSet = new ConcurrentSkipListSet<Pos>();
+	
+	 private String convertToChr(int i){
+		 switch (i){
+		 case 23:
+			 return "X";
+		 case 24:
+			 return "Y";
+		 case 25:
+			 return "M";	 
+		default:
+			return Integer.toString(i);
+			
+		 }
+	 }
+	 
+//	private Set<Pos> splitSet(int i){
+//		String chr = convertToChr(i+1);
+//		return posSet.headSet(new Pos(chr,0));	
+//	}
+	
+	public TabixBasedJoin(String input, String OutputDir){
+		posSet = new ConcurrentSkipListSet<BitSet>();
 		threadPool=Executors.newCachedThreadPool();
 		
 		File dir=new File(input);
@@ -181,7 +238,9 @@ public class TabixBasedJoin {
 				}
 			this.readerArray=new TabixReader[readerList.size()];
 			this.readerArray=readerList.toArray(readerArray);// Change to array for more efficient access
-			this.pw= new PrintWriter( new BufferedWriter(new FileWriter(OutputFile)));
+			this.outputDir = outputDir;
+			File output = new File(outputDir);
+			output.mkdirs();
 			
 		}catch(IOException ioe){
 			ioe.printStackTrace();
@@ -194,23 +253,48 @@ public class TabixBasedJoin {
 		for (int i=0; i<readerArray.length;i++)
 			taskList.add(new paraReader(readerArray[i]));
 		threadPool.invokeAll(taskList);
-		Pos[] posArray = new Pos[posSet.size()];
-		posArray = posSet.toArray(posArray);
+		//Pos[] posArray = new Pos[posSet.size()];
+		//posArray = posSet.toArray(posArray);
 		
-		for(Pos pos:posArray){
+		for(Pos pos:posSet){
 			logger.debug("chr {} seq {}", pos.getChr(),pos.getSeq());
 	}
-		logger.debug("posarray length {}", posArray.length);
+		logger.debug("posarray length {}", posSet.size());
 }
 	
 	public void Join() throws IOException{
-		
+		for(int i=0;i<25;i++){
+			writeToFile(splitSet(i),i);
+		}
 	}
 	
+	private void writeToFile(Set<Pos> subset, int i) throws IOException{
+		String chrString = convertToChr(i);
+		String outputFile = outputDir+"/"+chrString;
+		this.pw= new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
+		String chr;
+		int seq;
+		String query;
+		for(Pos pos: subset){
+			 chr = pos.getChr();
+			 seq= pos.getSeq();
+			 StringBuilder builder = new StringBuilder();
+			 query = builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
+			for (TabixReader reader: readerArray){
+				
+			}
+		}
+	}
 	
 	public static void main(String[] args) {
 		TabixBasedJoin tbj=new TabixBasedJoin(args[0],args[1]);
 	try{	
+		BitSet test= new BitSet(37);
+		int chr = 7;
+		int seq = 1023;
+		test=tbj.setBits(test,chr,seq);
+		System.out.println(test.toString());
+		System.exit(0);
 		tbj.readPosToSet();
 		}catch(IOException ioe){
 			ioe.printStackTrace();
