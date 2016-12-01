@@ -20,6 +20,8 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,10 +71,13 @@ public class TabixBasedJoin {
 			catch(IOException ioe){
 				logger.error("IOE exception in paraReader {} ", ioe.getStackTrace());
 			}
+			catch(Exception e){
+				logger.error("Exception {}",e.getStackTrace());
+			}
 			return READ_SUCCESS;
 		}
 		
-		private void extractPosToSet() throws IOException{
+		private void extractPosToSet() throws IOException, Exception{
 			String line;
 			boolean header=true;
 			while ((line = treader.readLine()) != null){
@@ -84,7 +89,7 @@ public class TabixBasedJoin {
 				}
 				else{
 					String[] fields = line.split("\\s");
-					//int chr = parseChr(fields[0]);
+					int chr = Integer.parseInt( parseChr(fields[0]) );
 					int seq = Integer.parseInt(fields[1]);
 					if(logger.isDebugEnabled()){
 						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
@@ -95,6 +100,21 @@ public class TabixBasedJoin {
 					
 				
 			}
+		}
+		
+		private String parseChr(String input) throws Exception{
+			Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
+			Matcher matcher = pattern.matcher(input);
+			if(matcher.find()){
+				int start = matcher.start();
+				int end = matcher.end();
+				String chr = input.substring(start,end);
+				return chr;
+			}
+			else{
+				throw new Exception("Chromosome can't be parsed");
+			}
+			
 		}
 	}
 	
