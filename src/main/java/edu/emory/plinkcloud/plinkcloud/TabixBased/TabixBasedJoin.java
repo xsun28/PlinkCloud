@@ -11,21 +11,90 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TabixBasedJoin {
+	private final int READ_SUCCESS = 1;
 	private TabixReader[] readerArray;
 	private PrintWriter pw=null;
 	protected final Logger logger = LoggerFactory.getLogger(getClass());  
+	private ConcurrentSkipListSet<Pos> posMap;
+	private ExecutorService threadPool;
+	class Pos implements Comparable<Pos>{
+		int chr;
+		int seq;
+		public Pos(int chr, int seq){
+			this.chr=chr;
+			this.seq=seq;
+		}
+		@Override
+		public int compareTo(Pos second){
+			if(this.chr!=second.chr){
+				return this.chr-second.chr;
+			}
+			else{
+				return this.seq-second.seq;
+			}
+		}
+	}
+	
+	class paraReader implements Callable<Integer>{
+		private TabixReader treader;
+		public paraReader(TabixReader treader){
+			this.treader=treader;
+		}
+		@Override
+		public Integer call() {
+			try{
+			extractPosToSet();
+			}
+			catch(IOException ioe){
+				logger.error("IOE exception in paraReader {} ", ioe.getStackTrace());
+			}
+			return READ_SUCCESS;
+		}
+		
+		private void extractPosToSet() throws IOException{
+			String line;
+			boolean header=true;
+			while ((line = treader.readLine()) != null){
+				if(!line.toLowerCase().startsWith("#chrom")&&header)
+					continue;
+				else if (line.toLowerCase().startsWith("#chrom")){
+					header=false;
+					continue;
+				}
+				else{
+					if(logger.isDebugEnabled()){
+						logger.debug("the first data line is: {}", line);
+					}
+					return;
+				}
+					
+				
+			}
+		}
+	}
 	
 	public TabixBasedJoin(String input, String OutputFile){
+		posMap = new ConcurrentSkipListSet<Pos>();
+		threadPool=Executors.newCachedThreadPool();
+		
 		File dir=new File(input);
 		String[] fileNames=dir.list(new FilenameFilter(){
 			@Override
 			public boolean accept(File dir,String name){
-				String regex = ".*vcf$";
+				String regex = ".*gz$";
 				return name.matches(regex);
 			}
 		});
@@ -59,8 +128,12 @@ public class TabixBasedJoin {
 		}
 	
 	
-	public void join() throws IOException{
-		System.out.println(readerArray[0].readLine());
+	public void join() throws IOException, InterruptedException{
+		List<paraReader> taskList = new ArrayList<paraReader>();
+		for (int i=0; i<readerArray.length;i++)
+			taskList.add(new paraReader(readerArray[i]));
+		threadPool.invokeAll(taskList);
+		
 	}
 	
 	
@@ -72,6 +145,8 @@ public class TabixBasedJoin {
 		tbj.join();
 		}catch(IOException ioe){
 			ioe.printStackTrace();
+		}catch(InterruptedException ie){
+			ie.printStackTrace();
 		}
 
 	}
