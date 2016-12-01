@@ -91,10 +91,12 @@ public class TabixBasedJoin {
 					String[] fields = line.split("\\s");
 					String chr =  parseChr(fields[0]) ;
 					int seq = Integer.parseInt(fields[1]);
-					if(logger.isDebugEnabled()){
-						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
-					}
-					break;
+					Pos pos = new Pos(chr, seq);
+					posSet.add(pos);
+//					if(logger.isDebugEnabled()){
+//						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
+//					}
+				
 					
 				}
 					
@@ -103,7 +105,7 @@ public class TabixBasedJoin {
 		}
 		
 		private String parseChr(String input) throws Exception{
-			String test = "chrM";
+			
 			Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
 			Matcher matcher = pattern.matcher(input);
 			if(matcher.find()){
@@ -166,8 +168,10 @@ public class TabixBasedJoin {
 		for (int i=0; i<readerArray.length;i++)
 			taskList.add(new paraReader(readerArray[i]));
 		threadPool.invokeAll(taskList);
-		
+		for(Pos pos:posSet){
+			logger.debug("chr {} seq {}", pos.getChr(),pos.getSeq());
 	}
+}
 	
 	
 	
