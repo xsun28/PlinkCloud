@@ -43,7 +43,33 @@ public class TabixBasedJoin {
 		@Override
 		public int compareTo(Pos second){
 			if(!this.chr.toLowerCase().equals(second.chr.toLowerCase())){
-				return this.chr.compareToIgnoreCase(second.chr);
+				int chrnum1, chrnum2;
+				switch (chr.toLowerCase()) {
+				case "m":
+					chrnum1 = 25; break;
+				case "x":
+					chrnum1 = 23; break;
+				case "y":
+					chrnum1 = 24; break;
+
+				default:
+					chrnum1 = Integer.parseInt(chr);
+					break;
+				}
+				
+				switch (second.chr.toLowerCase()) {
+				case "m":
+					chrnum2 = 25; break;
+				case "x":
+					chrnum2 = 23; break;
+				case "y":
+					chrnum2 = 24; break;
+
+				default:
+					chrnum2 = Integer.parseInt(chr);
+					break;
+				}
+				return chrnum1-chrnum2;
 			}
 			else{
 				return this.seq-second.seq;
@@ -168,9 +194,13 @@ public class TabixBasedJoin {
 		for (int i=0; i<readerArray.length;i++)
 			taskList.add(new paraReader(readerArray[i]));
 		threadPool.invokeAll(taskList);
-		for(Pos pos:posSet){
+		Pos[] posArray = new Pos[posSet.size()];
+		posArray = posSet.toArray(posArray);
+		
+		for(Pos pos:posArray){
 			logger.debug("chr {} seq {}", pos.getChr(),pos.getSeq());
 	}
+		logger.debug("posarray length {}", posArray.length);
 }
 	
 	
