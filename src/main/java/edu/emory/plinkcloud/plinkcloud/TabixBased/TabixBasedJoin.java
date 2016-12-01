@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.SortedSet;
+import java.util.StringTokenizer;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -28,7 +29,7 @@ public class TabixBasedJoin {
 	private TabixReader[] readerArray;
 	private PrintWriter pw=null;
 	protected final Logger logger = LoggerFactory.getLogger(getClass());  
-	private ConcurrentSkipListSet<Pos> posMap;
+	private ConcurrentSkipListSet<Pos> posSet;
 	private ExecutorService threadPool;
 	class Pos implements Comparable<Pos>{
 		int chr;
@@ -45,6 +46,13 @@ public class TabixBasedJoin {
 			else{
 				return this.seq-second.seq;
 			}
+		}
+		public int getChr(){
+			return chr;
+		}
+		
+		public int getSeq(){
+			return seq;
 		}
 	}
 	
@@ -75,10 +83,14 @@ public class TabixBasedJoin {
 					continue;
 				}
 				else{
+					String[] fields = line.split("\\s");
+					//int chr = parseChr(fields[0]);
+					int seq = Integer.parseInt(fields[1]);
 					if(logger.isDebugEnabled()){
-						logger.debug("the first data line is: {}", line);
+						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
 					}
-					return;
+					break;
+					
 				}
 					
 				
@@ -87,7 +99,7 @@ public class TabixBasedJoin {
 	}
 	
 	public TabixBasedJoin(String input, String OutputFile){
-		posMap = new ConcurrentSkipListSet<Pos>();
+		posSet = new ConcurrentSkipListSet<Pos>();
 		threadPool=Executors.newCachedThreadPool();
 		
 		File dir=new File(input);
