@@ -34,22 +34,22 @@ public class TabixBasedJoin {
 	private ConcurrentSkipListSet<Pos> posSet;
 	private ExecutorService threadPool;
 	class Pos implements Comparable<Pos>{
-		int chr;
+		String chr;
 		int seq;
-		public Pos(int chr, int seq){
+		public Pos(String chr, int seq){
 			this.chr=chr;
 			this.seq=seq;
 		}
 		@Override
 		public int compareTo(Pos second){
-			if(this.chr!=second.chr){
-				return this.chr-second.chr;
+			if(!this.chr.toLowerCase().equals(second.chr.toLowerCase())){
+				return this.chr.compareToIgnoreCase(second.chr);
 			}
 			else{
 				return this.seq-second.seq;
 			}
 		}
-		public int getChr(){
+		public String getChr(){
 			return chr;
 		}
 		
@@ -89,7 +89,7 @@ public class TabixBasedJoin {
 				}
 				else{
 					String[] fields = line.split("\\s");
-					int chr = Integer.parseInt( parseChr(fields[0]) );
+					String chr =  parseChr(fields[0]) ;
 					int seq = Integer.parseInt(fields[1]);
 					if(logger.isDebugEnabled()){
 						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
@@ -103,6 +103,7 @@ public class TabixBasedJoin {
 		}
 		
 		private String parseChr(String input) throws Exception{
+			String test = "chrM";
 			Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
 			Matcher matcher = pattern.matcher(input);
 			if(matcher.find()){
