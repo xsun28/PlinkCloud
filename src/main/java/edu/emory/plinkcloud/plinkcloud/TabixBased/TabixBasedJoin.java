@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -206,8 +207,9 @@ public class TabixBasedJoin {
 //		return posSet.headSet(new Pos(chr,0));	
 //	}
 	
-	public TabixBasedJoin(String input, String OutputDir){
-	
+	public TabixBasedJoin(String input, String outputDir){
+
+		
 		posSet = new ConcurrentSkipListSet<BitSet>(new Comparator<BitSet>(){
 			@Override
 			public int compare(BitSet bs1, BitSet bs2){
@@ -215,7 +217,7 @@ public class TabixBasedJoin {
 				long bs1_long = bs1.toLongArray()[0]; 
 				long bs2_long = bs2.toLongArray()[0];
 				if(bs1_long==bs2_long) return 0;
-				else return bs1_long>bs2_long?-1:1;
+				else return bs1_long>bs2_long?1:-1;
 			}		
 		});
 		threadPool=Executors.newCachedThreadPool();
