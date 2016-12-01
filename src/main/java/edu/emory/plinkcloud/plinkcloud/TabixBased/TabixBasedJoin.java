@@ -66,7 +66,7 @@ public class TabixBasedJoin {
 					chrnum2 = 24; break;
 
 				default:
-					chrnum2 = Integer.parseInt(chr);
+					chrnum2 = Integer.parseInt(second.chr);
 					break;
 				}
 				return chrnum1-chrnum2;
@@ -175,9 +175,9 @@ public class TabixBasedJoin {
 			ArrayList<TabixReader> readerList=new ArrayList<TabixReader>();
 			for(String name:nameList){
 				readerList.add(new TabixReader(context+name));
-				if(logger.isDebugEnabled()){
-					logger.debug("File name {}",context+name);
-				}
+//				if(logger.isDebugEnabled()){
+//					logger.debug("File name {}",context+name);
+//				}
 				}
 			this.readerArray=new TabixReader[readerList.size()];
 			this.readerArray=readerList.toArray(readerArray);// Change to array for more efficient access
@@ -189,7 +189,7 @@ public class TabixBasedJoin {
 		}
 	
 	
-	public void join() throws IOException, InterruptedException{
+	public void readPosToSet() throws IOException, InterruptedException{
 		List<paraReader> taskList = new ArrayList<paraReader>();
 		for (int i=0; i<readerArray.length;i++)
 			taskList.add(new paraReader(readerArray[i]));
@@ -203,13 +203,15 @@ public class TabixBasedJoin {
 		logger.debug("posarray length {}", posArray.length);
 }
 	
-	
+	public void Join() throws IOException{
+		
+	}
 	
 	
 	public static void main(String[] args) {
 		TabixBasedJoin tbj=new TabixBasedJoin(args[0],args[1]);
 	try{	
-		tbj.join();
+		tbj.readPosToSet();
 		}catch(IOException ioe){
 			ioe.printStackTrace();
 		}catch(InterruptedException ie){
