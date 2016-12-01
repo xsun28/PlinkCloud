@@ -121,7 +121,7 @@ public class TabixBasedJoin {
 					int chr =  parseChr(fields[0].trim()) ;
 					int seq = Integer.parseInt(fields[1].trim());
 					BitSet bs = new BitSet(37);
-					bs = setBits(bs, chr,seq);
+					bs = setBits(bs,chr,seq);
 //					Pos pos = new Pos(chr, seq);
 					posSet.add(bs);
 //					if(logger.isDebugEnabled()){
@@ -134,28 +134,8 @@ public class TabixBasedJoin {
 				
 			}
 		}
-	}
 		
-		public BitSet setBits(BitSet bs, int chr, int seq){
-			int remain = chr;
-			for (int i=3;i>=0;i--){
-				if(remain==0) break;
-				int residual = remain%2;
-				remain = remain/2;				
-				if(residual==1) bs.set(i);				
-			}
-			
-			remain = seq;
-			for(int i=36;i>=4;i--){
-				if(remain==0) break;
-				int residual = remain%2;
-				remain = remain/2;
-				if(residual==1) bs.set(i);
-			}
-			return bs;
-		}
-		
-		private int parseChr(String input) throws Exception{
+	private int parseChr(String input) throws Exception{
 			
 			Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
 			Matcher matcher = pattern.matcher(input);
@@ -183,6 +163,28 @@ public class TabixBasedJoin {
 			}
 			
 		}
+	}//end of paraReader
+		
+		public BitSet setBits(BitSet bs, int chr, int seq){
+			int remain = chr;
+			for (int i=32;i<=36;i++){
+				if(remain==0) break;
+				int residual = remain%2;
+				remain = remain/2;				
+				if(residual==1) bs.set(i);				
+			}
+			
+			remain = seq;
+			for(int i=0;i<=31;i++){
+				if(remain==0) break;
+				int residual = remain%2;
+				remain = remain/2;
+				if(residual==1) bs.set(i);
+			}
+			return bs;
+		}
+		
+	
 	
 	
 	 private String convertToChr(int i){
@@ -205,7 +207,17 @@ public class TabixBasedJoin {
 //	}
 	
 	public TabixBasedJoin(String input, String OutputDir){
-		posSet = new ConcurrentSkipListSet<BitSet>();
+	
+		posSet = new ConcurrentSkipListSet<BitSet>(new Comparator<BitSet>(){
+			@Override
+			public int compare(BitSet bs1, BitSet bs2){
+				
+				long bs1_long = bs1.toLongArray()[0]; 
+				long bs2_long = bs2.toLongArray()[0];
+				if(bs1_long==bs2_long) return 0;
+				else return bs1_long>bs2_long?-1:1;
+			}		
+		});
 		threadPool=Executors.newCachedThreadPool();
 		
 		File dir=new File(input);
@@ -256,45 +268,40 @@ public class TabixBasedJoin {
 		//Pos[] posArray = new Pos[posSet.size()];
 		//posArray = posSet.toArray(posArray);
 		
-		for(Pos pos:posSet){
-			logger.debug("chr {} seq {}", pos.getChr(),pos.getSeq());
+		for(BitSet bs:posSet){
+			logger.debug("chr {} seq {}", bs.get(32,36).toLongArray()[0] ,bs.get(0, 31).toLongArray()[0]);
 	}
 		logger.debug("posarray length {}", posSet.size());
 }
-	
-	public void Join() throws IOException{
-		for(int i=0;i<25;i++){
-			writeToFile(splitSet(i),i);
-		}
-	}
-	
-	private void writeToFile(Set<Pos> subset, int i) throws IOException{
-		String chrString = convertToChr(i);
-		String outputFile = outputDir+"/"+chrString;
-		this.pw= new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
-		String chr;
-		int seq;
-		String query;
-		for(Pos pos: subset){
-			 chr = pos.getChr();
-			 seq= pos.getSeq();
-			 StringBuilder builder = new StringBuilder();
-			 query = builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
-			for (TabixReader reader: readerArray){
-				
-			}
-		}
-	}
+//	
+//	public void Join() throws IOException{
+//		for(int i=0;i<25;i++){
+//			writeToFile(splitSet(i),i);
+//		}
+//	}
+//	
+//	private void writeToFile(Set<BitSet> subset, int i) throws IOException{
+//		String chrString = convertToChr(i);
+//		String outputFile = outputDir+"/"+chrString;
+//		this.pw= new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
+//		String chr;
+//		int seq;
+//		String query;
+//		for(Pos pos: subset){
+//			 chr = pos.getChr();
+//			 seq= pos.getSeq();
+//			 StringBuilder builder = new StringBuilder();
+//			 query = builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
+//			for (TabixReader reader: readerArray){
+//				
+//			}
+//		}
+//	}
 	
 	public static void main(String[] args) {
 		TabixBasedJoin tbj=new TabixBasedJoin(args[0],args[1]);
 	try{	
-		BitSet test= new BitSet(37);
-		int chr = 7;
-		int seq = 1023;
-		test=tbj.setBits(test,chr,seq);
-		System.out.println(test.toString());
-		System.exit(0);
+	
 		tbj.readPosToSet();
 		}catch(IOException ioe){
 			ioe.printStackTrace();
