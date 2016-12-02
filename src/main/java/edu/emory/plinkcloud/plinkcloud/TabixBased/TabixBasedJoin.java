@@ -209,11 +209,7 @@ public class TabixBasedJoin {
 		Pos[] posArray = new Pos[posSet.size()];
 		posArray = posSet.toArray(posArray);
 		
-		for(Pos pos:posArray){
-			logger.debug("chr {} seq {}", pos.getChr(),pos.getSeq());
 	}
-		logger.debug("posarray length {}", posArray.length);
-}
 	
 	public void JoinToTPed() throws IOException, InterruptedException{
 		ArrayList<writeToFileAsTPed> writeTaskList = new ArrayList<writeToFileAsTPed>();  
@@ -266,6 +262,7 @@ public class TabixBasedJoin {
 		               StringBuilder query_builder = new StringBuilder();
 		               StringBuilder result_builder = new StringBuilder();
 		               query = query_builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
+		              
 		               result_builder.append(chr_str).append("\t").append("rs#\t").append("0\t").append(seq);
 		              for (TabixReader reader: readerArray){
 		            	  String result;
@@ -296,6 +293,7 @@ public class TabixBasedJoin {
 		            		  result_builder.append("\t").append(ref+" "+ref);
 		            	  }
 		              }
+		              logger.debug("result is {}",result_builder.toString());
 		      	pw.println(result_builder.toString());
 		    }
 		    pw.close();
