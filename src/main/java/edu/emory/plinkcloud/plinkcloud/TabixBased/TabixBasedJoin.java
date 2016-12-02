@@ -211,7 +211,7 @@ public class TabixBasedJoin {
 		
 	}
 	
-	public void JoinToTPed() throws IOException, InterruptedException{
+	public void JoinToTPed() throws IOException, InterruptedException, Exception{
 		ArrayList<writeToFileAsTPed> writeTaskList = new ArrayList<writeToFileAsTPed>();  
 		for(int i=1;i<=25;i++)
            writeTaskList.add(new writeToFileAsTPed(i));
@@ -245,7 +245,7 @@ public class TabixBasedJoin {
 			this.chr = i;
 		}
 		@Override
-		public Integer call() throws IOException{
+		public Integer call() throws IOException, Exception{
 			String chrString = convertToChr(chr);
 		    String outputFile = outputDir+"/"+chrString;
 		    NavigableSet<Pos> subset = splitSet(chr);
@@ -272,8 +272,10 @@ public class TabixBasedJoin {
 		            		 String [] fields = result.split("\\s");
 		            		 String genotype_field = fields[9].trim();
 		            		 String alt = fields[4].trim();
+		            		 String genotype = null;
 		            		 Matcher matcher = genotypePattern.matcher(genotype_field);
-		            		 String genotype = genotype_field.substring(matcher.start(), matcher.end());
+		            		 if(matcher.find())
+		            		 genotype = genotype_field.substring(matcher.start(), matcher.end());
 		            		 switch(genotype){
 		            		 case "0/1" :
 		            		 case "1/0" :
@@ -293,7 +295,7 @@ public class TabixBasedJoin {
 		            		  result_builder.append("\t").append(ref+" "+ref);
 		            	  }
 		              }
-		              logger.debug("result is {}",result_builder.toString());
+		              logger.debug("output result is {}",result_builder.toString());
 		      	pw.println(result_builder.toString());
 		    }
 		    pw.close();
@@ -313,6 +315,8 @@ public class TabixBasedJoin {
 			ioe.printStackTrace();
 		}catch(InterruptedException ie){
 			ie.printStackTrace();
+		}catch(Exception e){
+			e.printStackTrace();
 		}
 	}//end of main
 
