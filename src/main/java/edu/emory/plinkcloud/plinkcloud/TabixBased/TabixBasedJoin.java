@@ -13,24 +13,21 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.SortedSet;
-import java.util.StringTokenizer;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TabixBasedJoin {
-	private final int READ_SUCCESS = 1;
+	
+	public static final int READ_SUCCESS = 1;
+	public static final int WRITE_SUCCESS = 2;
+	
 	private TabixReader[] readerArray;
-	private PrintWriter pw=null;
 	protected final Logger logger = LoggerFactory.getLogger(getClass());  
 	private ConcurrentSkipListSet<Pos> posSet;
 	private ExecutorService threadPool;
@@ -207,10 +204,12 @@ public class TabixBasedJoin {
 		logger.debug("posarray length {}", posArray.length);
 }
 	
-	public void JoinToTPed() throws IOException{
-		 for(int i=0;i<25;i++){
-           writeToFile(splitSet(i),i);
-		 }
+	public void JoinToTPed() throws IOException, InterruptedException{
+		ArrayList<writeToFileAsTPed> writeTaskList = new ArrayList<writeToFileAsTPed>();  
+		for(int i=0;i<25;i++)
+           writeTaskList.add(new writeToFileAsTPed(i));
+		
+		threadPool.invokeAll(writeTaskList);
 	}
 	
 	private String convertToChr(int i){
@@ -228,26 +227,40 @@ public class TabixBasedJoin {
 	}
 	
 	private NavigableSet<Pos> splitSet(int i){
-      String chr = convertToChr(i+1);
-      return posSet.headSet(new Pos(chr,0));
-}
-	private void writeToFile(NavigableSet<Pos> subset, int i) throws IOException{
-      String chrString = convertToChr(i);
-      String outputFile = outputDir+"/"+chrString;
-      this.pw= new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
-      String chr;
-      int seq;
-      String query;
-      for(Pos pos: subset){
-               chr = pos.getChr();
-               seq= pos.getSeq();
-               StringBuilder builder = new StringBuilder();
-               query = builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
-              for (TabixReader reader: readerArray){
+      String ceil_chr = convertToChr(i+1);
+      return posSet.headSet(new Pos(ceil_chr,0));
+	}
+	
+	class writeToFileAsTPed implements Callable<Integer>{
+		private int chr;
+		public writeToFileAsTPed(int i){
+			this.chr = i;
+		}
+		@Override
+		public Integer call() throws IOException{
+			String chrString = convertToChr(chr);
+		    String outputFile = outputDir+"/"+chrString;
+		    NavigableSet<Pos> subset = splitSet(chr);
+		    PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
+		    String chr_str;
+		    int seq;
+		    String query;
+		    for(Pos pos: subset){
+		               chr_str = pos.getChr();
+		               seq= pos.getSeq();
+		               pw.println("chr: "+chr_str+" seq: "+seq);
+//		               StringBuilder builder = new StringBuilder();
+//		               query = builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
+//		              for (TabixReader reader: readerArray){
+//
+//		              }
+		      	}
+		    pw.close();
+		    return WRITE_SUCCESS;
+		}
+		
+	}
 
-              }
-      }
-}
 
 	public static void main(String[] args) {
 		TabixBasedJoin tbj=new TabixBasedJoin(args[0],args[1]);
