@@ -36,17 +36,12 @@ public class TabixBasedJoin {
 		private String chr;
 		private String ref;
 		private int seq;
-		
+		private String SNP_ID;
 		public Pos(String chr, int seq){
 			this.chr = chr;
 			this.seq = seq;
 		}
 		
-		public Pos(String chr, int seq, String ref){
-			this.chr = chr;
-			this.seq = seq;
-			this.ref = ref;
-		}
 		@Override
 		public int compareTo(Pos second){
 			if(!this.chr.toLowerCase().equals(second.chr.toLowerCase())){
@@ -93,6 +88,18 @@ public class TabixBasedJoin {
 		public String getRef(){
 			return ref;
 		}
+		
+		public void seRef(String ref){
+			this.ref = ref;
+		}
+		
+		public String getSNP_ID(){
+			return SNP_ID;
+		}
+		
+		public void setSNP_ID(String id){
+			this.SNP_ID =  id;
+		}
 	}// end of Pos class
 	
 	class paraReader implements Callable<Integer>{
@@ -104,14 +111,17 @@ public class TabixBasedJoin {
 		public Integer call() {
 			try{
 			extractPosToSet();
+			return READ_SUCCESS;
 			}
 			catch(IOException ioe){
-				logger.error("IOE exception in paraReader {} ", ioe.getStackTrace());
+				logger.error("IOE exception in paraReader {} ", ioe);
+				return -2;
 			}
 			catch(Exception e){
-				logger.error("Exception {}",e.getStackTrace());
+				logger.error("Exception in paraReader {}",e);
+				return -3;
 			}
-			return READ_SUCCESS;
+			
 		}
 		
 		private void extractPosToSet() throws IOException, Exception{
@@ -129,7 +139,10 @@ public class TabixBasedJoin {
 					String chr =  parseChr(fields[0].trim()) ;
 					int seq = Integer.parseInt(fields[1].trim());
 					String ref = fields[3].trim();
-					Pos pos = new Pos(chr, seq, ref);
+					String snp_id = fields[2].trim();
+					Pos pos = new Pos(chr, seq);
+					pos.seRef(ref);
+					pos.setSNP_ID(snp_id);
 					posSet.add(pos);
 //					if(logger.isDebugEnabled()){
 //						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
@@ -218,6 +231,10 @@ public class TabixBasedJoin {
 		threadPool.invokeAll(writeTaskList);
 	}
 	
+	public void JoinToPED() throws IOException, InterruptedException, Exception{
+	
+	}
+	
 	private String convertToChr(int i){
         switch (i){
         case 23:
@@ -238,6 +255,28 @@ public class TabixBasedJoin {
 		return posSet.subSet(new Pos(floor_chr,0), new Pos(ceil_chr,0)); 
 	}
 	
+	private String parseGenotype(String line){
+		StringBuilder genotype = new StringBuilder();
+		String numbered_genotype = null;//1/0, 1/1...
+		Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
+		String [] fields = line.split("\\s");
+		String genotype_field = fields[9].trim();
+		String [] alts = fields[4].trim().split(",");
+		String ref = fields[3].trim();
+		Matcher matcher = genotypePattern.matcher(genotype_field);
+		if(matcher.find())
+			numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
+		String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
+		for (int i=0;i<genotype_numbers.length;i++){
+			int number = Integer.parseInt(genotype_numbers[i].trim());
+			if(number==0)
+				genotype.append(ref).append(" ");
+			else
+				genotype.append(alts[number-1]).append(" ");	
+		}
+		return genotype.toString().trim();
+	}
+	
 	class writeToFileAsTPed implements Callable<Integer>{
 		private int chr;
 		private TabixReader[] readerArray;
@@ -254,51 +293,34 @@ public class TabixBasedJoin {
 		    String ref;
 		    int seq;
 		    String query;
-		    Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
+		    String SNP_ID;
+		   
 			try(PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(outputFile)))){
 				for(Pos pos: subset){
 		               chr_str = pos.getChr();
 		               seq = pos.getSeq();
 		               ref = pos.getRef();
+		               SNP_ID = pos.getSNP_ID();
 		               StringBuilder query_builder = new StringBuilder();
 		               StringBuilder result_builder = new StringBuilder();
 		               query = query_builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
 		              
-		               result_builder.append(chr_str).append("\t").append("rs#\t").append("0\t").append(seq);
+		               result_builder.append(chr_str).append("\t").append(SNP_ID).append("\t").append("0\t").append(seq);
 		              for (TabixReader reader: readerArray){
 		            	  String result;
+		            	  String genotype;
 		            	  TabixReader.Iterator queryResultsIter = reader.query(query);
 		            	  if(queryResultsIter != null && (result = queryResultsIter.next()) != null)
 		            	  {
-		            		 String [] fields = result.split("\\s");
-		            		 String genotype_field = fields[9].trim();
-		            		 String alt = fields[4].trim();
-		            		 String genotype = null;
-		            		 Matcher matcher = genotypePattern.matcher(genotype_field);
-		            		 if(matcher.find())
-		            		 genotype = genotype_field.substring(matcher.start(), matcher.end());
-		            		 switch(genotype){
-		            		 case "0/1" :
-		            		 case "1/0" :
-		            			 result_builder.append("\t").append(ref+" "+alt);
-		            			 break;
-		            		 case "0/0":
-		            			 result_builder.append("\t").append(ref+" "+ref);
-		            			 break;
-		            		 case "1/1":
-		            			 result_builder.append("\t").append(alt+" "+alt);
-		            			 break;
-		            		default:
-		            			logger.error("Unknown genotype: {}",genotype);
-		            			break;
-		            		 }
+		            		 genotype = parseGenotype(result);
+		            		 result_builder.append("\t").append(genotype);
 		            	  }else{
 		            		  result_builder.append("\t").append(ref+" "+ref);
 		            	  }
 		              }
-		              logger.debug("output result is {}",result_builder.toString());
+		              //logger.debug("output result is {}",result_builder.toString());
 		      	pw.println(result_builder.toString());
-		    }
+				}
 		   
 		    return WRITE_SUCCESS;
 		}catch(Exception e){
