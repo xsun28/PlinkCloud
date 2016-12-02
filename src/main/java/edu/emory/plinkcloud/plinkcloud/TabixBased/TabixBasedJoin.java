@@ -206,7 +206,7 @@ public class TabixBasedJoin {
 	
 	public void JoinToTPed() throws IOException, InterruptedException{
 		ArrayList<writeToFileAsTPed> writeTaskList = new ArrayList<writeToFileAsTPed>();  
-		for(int i=0;i<25;i++)
+		for(int i=1;i<=25;i++)
            writeTaskList.add(new writeToFileAsTPed(i));
 		
 		threadPool.invokeAll(writeTaskList);
@@ -227,8 +227,9 @@ public class TabixBasedJoin {
 	}
 	
 	private NavigableSet<Pos> splitSet(int i){
-      String ceil_chr = convertToChr(i+1);
-      return posSet.headSet(new Pos(ceil_chr,0));
+		String floor_chr = convertToChr(i);
+		String ceil_chr = convertToChr(i+1);
+		return posSet.subSet(new Pos(floor_chr,0), new Pos(ceil_chr,0)); 
 	}
 	
 	class writeToFileAsTPed implements Callable<Integer>{
@@ -266,6 +267,7 @@ public class TabixBasedJoin {
 		TabixBasedJoin tbj=new TabixBasedJoin(args[0],args[1]);
 	try{	
 		tbj.readPosToSet();
+		tbj.JoinToTPed();
 		}catch(IOException ioe){
 			ioe.printStackTrace();
 		}catch(InterruptedException ie){
