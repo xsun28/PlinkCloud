@@ -303,7 +303,7 @@ public class TabixBasedJoin {
 		               SNP_ID = pos.getSNP_ID();
 		               StringBuilder query_builder = new StringBuilder();
 		               StringBuilder result_builder = new StringBuilder();
-		               query = query_builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
+		               query = query_builder.append("chr").append(chr_str).append(":").append(seq).append("-").append(seq).toString();
 		              
 		               result_builder.append(chr_str).append("\t").append(SNP_ID).append("\t").append("0\t").append(seq);
 		              for (TabixReader reader: readerArray){
