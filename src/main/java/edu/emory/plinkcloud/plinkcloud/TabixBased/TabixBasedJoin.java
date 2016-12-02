@@ -32,12 +32,21 @@ public class TabixBasedJoin {
 	private ConcurrentSkipListSet<Pos> posSet;
 	private ExecutorService threadPool;
 	private String outputDir;
+	
 	class Pos implements Comparable<Pos>{
-		String chr;
-		int seq;
+		private String chr;
+		private String ref;
+		private int seq;
+		
 		public Pos(String chr, int seq){
-			this.chr=chr;
-			this.seq=seq;
+			this.chr = chr;
+			this.seq = seq;
+		}
+		
+		public Pos(String chr, int seq, String ref){
+			this.chr = chr;
+			this.seq = seq;
+			this.ref = ref;
 		}
 		@Override
 		public int compareTo(Pos second){
@@ -81,7 +90,11 @@ public class TabixBasedJoin {
 		public int getSeq(){
 			return seq;
 		}
-	}
+		
+		public String getRef(){
+			return ref;
+		}
+	}// end of Pos class
 	
 	class paraReader implements Callable<Integer>{
 		private TabixReader treader;
@@ -116,16 +129,13 @@ public class TabixBasedJoin {
 					String[] fields = line.split("\\s");
 					String chr =  parseChr(fields[0].trim()) ;
 					int seq = Integer.parseInt(fields[1].trim());
-					Pos pos = new Pos(chr, seq);
+					String ref = fields[3].trim();
+					Pos pos = new Pos(chr, seq, ref);
 					posSet.add(pos);
 //					if(logger.isDebugEnabled()){
 //						logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
-//					}
-				
-					
-				}
-					
-				
+//					}					
+				}		
 			}
 		}
 		
@@ -141,11 +151,12 @@ public class TabixBasedJoin {
 			}
 			else{
 				throw new Exception("Chromosome can't be parsed");
-			}
-			
+				}		
 		}
-	}
+		
+	}// end of paraReader
 	
+
 	public TabixBasedJoin(String input, String outputDir){
 		posSet = new ConcurrentSkipListSet<Pos>();
 		threadPool=Executors.newCachedThreadPool();
@@ -187,8 +198,8 @@ public class TabixBasedJoin {
 		}catch(IOException ioe){
 			ioe.printStackTrace();
 		}
-		}
-	
+		
+	}//end of the constructor of TabixBasedJoin
 	
 	public void readPosToSet() throws IOException, InterruptedException{
 		List<paraReader> taskList = new ArrayList<paraReader>();
@@ -244,26 +255,58 @@ public class TabixBasedJoin {
 		    NavigableSet<Pos> subset = splitSet(chr);
 		    PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
 		    String chr_str;
+		    String ref;
 		    int seq;
 		    String query;
+		    Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
 		    for(Pos pos: subset){
 		               chr_str = pos.getChr();
-		               seq= pos.getSeq();
-		               pw.println("chr: "+chr_str+" seq: "+seq);
-//		               StringBuilder builder = new StringBuilder();
-//		               query = builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
-//		              for (TabixReader reader: readerArray){
-//
-//		              }
-		      	}
+		               seq = pos.getSeq();
+		               ref = pos.getRef();
+		               StringBuilder query_builder = new StringBuilder();
+		               StringBuilder result_builder = new StringBuilder();
+		               query = query_builder.append("chr").append(chr).append(":").append(seq).append("-").append(seq).toString();
+		               result_builder.append(chr_str).append("\t").append("rs#\t").append("0\t").append(seq);
+		              for (TabixReader reader: readerArray){
+		            	  String result;
+		            	  TabixReader.Iterator queryResultsIter = reader.query(query);
+		            	  if(queryResultsIter != null && (result = queryResultsIter.next()) != null)
+		            	  {
+		            		 String [] fields = result.split("\\s");
+		            		 String genotype_field = fields[9].trim();
+		            		 String alt = fields[4].trim();
+		            		 Matcher matcher = genotypePattern.matcher(genotype_field);
+		            		 String genotype = genotype_field.substring(matcher.start(), matcher.end());
+		            		 switch(genotype){
+		            		 case "0/1" :
+		            		 case "1/0" :
+		            			 result_builder.append("\t").append(ref+" "+alt);
+		            			 break;
+		            		 case "0/0":
+		            			 result_builder.append("\t").append(ref+" "+ref);
+		            			 break;
+		            		 case "1/1":
+		            			 result_builder.append("\t").append(alt+" "+alt);
+		            			 break;
+		            		default:
+		            			logger.error("Unknown genotype: {}",genotype);
+		            			break;
+		            		 }
+		            	  }else{
+		            		  result_builder.append("\t").append(ref+" "+ref);
+		            	  }
+		              }
+		      	pw.println(result_builder.toString());
+		    }
 		    pw.close();
 		    return WRITE_SUCCESS;
 		}
 		
-	}
+	}// end of writeToFileAsTPed class
 
 
 	public static void main(String[] args) {
+	
 		TabixBasedJoin tbj=new TabixBasedJoin(args[0],args[1]);
 	try{	
 		tbj.readPosToSet();
@@ -273,7 +316,6 @@ public class TabixBasedJoin {
 		}catch(InterruptedException ie){
 			ie.printStackTrace();
 		}
-
-	}
+	}//end of main
 
 }
