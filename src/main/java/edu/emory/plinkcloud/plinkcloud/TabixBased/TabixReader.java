@@ -28,12 +28,17 @@ import net.sf.samtools.util.BlockCompressedInputStream;
 import java.io.*;
 import java.nio.*;
 import java.util.HashMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.lang.StringBuffer;
 
 public class TabixReader
-{
+{	
+	private Logger logger = LoggerFactory.getLogger(getClass());
 	private String mFn;
 	private BlockCompressedInputStream mFp;
 
@@ -320,6 +325,9 @@ public class TabixReader
 	public Iterator query(final int tid, final int beg, final int end) {
 		TPair64[] off, chunks;
 		long min_off;
+		if(tid<0 || tid>mIndex.length){
+			logger.error("tid error: tid is {}, mIndex length is{}",tid,mIndex.length);
+		}
 		TIndex idx = mIndex[tid];
 		int[] bins = new int[MAX_BIN];
 		int i, l, n_off, n_bins = reg2bins(beg, end, bins);
@@ -368,7 +376,10 @@ public class TabixReader
 	
 	public Iterator query(final String reg) {
 		int[] x = parseReg(reg);
-		if(x[0]==-1) return null;
+		if(x[0]==-1) {
+			logger.info("can't find the chromosome, reg is {}",reg);
+			return null;
+		}
 		return query(x[0], x[1], x[2]);
 	}
 
