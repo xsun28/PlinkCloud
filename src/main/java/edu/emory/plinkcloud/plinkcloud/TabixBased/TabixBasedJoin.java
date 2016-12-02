@@ -26,13 +26,12 @@ public class TabixBasedJoin {
 	
 	public static final int READ_SUCCESS = 1;
 	public static final int WRITE_SUCCESS = 2;
-	
-	private TabixReader[] readerArray;
 	protected final Logger logger = LoggerFactory.getLogger(getClass());  
 	private ConcurrentSkipListSet<Pos> posSet;
 	private ExecutorService threadPool;
 	private String outputDir;
-	
+	private String inputFileContext;
+	private ArrayList<String> inputFileNameList;
 	class Pos implements Comparable<Pos>{
 		private String chr;
 		private String ref;
@@ -156,7 +155,20 @@ public class TabixBasedJoin {
 		
 	}// end of paraReader
 	
-
+	private TabixReader[] createReaderArray() throws IOException{
+		
+			ArrayList<TabixReader> readerList=new ArrayList<TabixReader>();
+			for(String name:inputFileNameList){
+				readerList.add(new TabixReader(inputFileContext+name));
+//				if(logger.isDebugEnabled()){
+//					logger.debug("File name {}",context+name);
+//				}
+				}
+			TabixReader[] readerArray=new TabixReader[readerList.size()];
+			readerArray=readerList.toArray(readerArray);// Change to array for more efficient access
+			return readerArray;	
+	}
+	
 	public TabixBasedJoin(String input, String outputDir){
 		posSet = new ConcurrentSkipListSet<Pos>();
 		threadPool=Executors.newCachedThreadPool();
@@ -169,10 +181,11 @@ public class TabixBasedJoin {
 				return name.matches(regex);
 			}
 		});
-		String context=dir.getAbsolutePath()+"/";
+		
+		inputFileContext = dir.getAbsolutePath()+"/";
 
-		ArrayList<String> nameList = new ArrayList<String>(Arrays.asList(fileNames));
-		Collections.sort(nameList,new Comparator<String>(){
+		inputFileNameList = new ArrayList<String>(Arrays.asList(fileNames));
+		Collections.sort(inputFileNameList,new Comparator<String>(){
 			@Override
 			public int compare(String name1,String name2){
 				int number1 = Integer.parseInt(name1.substring(0,name1.indexOf(".")));
@@ -180,28 +193,14 @@ public class TabixBasedJoin {
 				return number1-number2;
 			}
 		});
+		File out_dir = new File(outputDir);
+		if(!out_dir.exists()) out_dir.mkdirs();
 		
-		try{
-			ArrayList<TabixReader> readerList=new ArrayList<TabixReader>();
-			for(String name:nameList){
-				readerList.add(new TabixReader(context+name));
-//				if(logger.isDebugEnabled()){
-//					logger.debug("File name {}",context+name);
-//				}
-				}
-			this.readerArray=new TabixReader[readerList.size()];
-			this.readerArray=readerList.toArray(readerArray);// Change to array for more efficient access
-			File out_dir = new File(outputDir);
-			if(!out_dir.exists()) out_dir.mkdirs();
-			
-			
-		}catch(IOException ioe){
-			ioe.printStackTrace();
-		}
 		
 	}//end of the constructor of TabixBasedJoin
 	
 	public void readPosToSet() throws IOException, InterruptedException{
+		TabixReader[] readerArray = createReaderArray();
 		List<paraReader> taskList = new ArrayList<paraReader>();
 		for (int i=0; i<readerArray.length;i++)
 			taskList.add(new paraReader(readerArray[i]));
@@ -241,21 +240,23 @@ public class TabixBasedJoin {
 	
 	class writeToFileAsTPed implements Callable<Integer>{
 		private int chr;
-		public writeToFileAsTPed(int i){
+		private TabixReader[] readerArray;
+		public writeToFileAsTPed(int i) throws IOException{
 			this.chr = i;
+			readerArray = createReaderArray();
 		}
 		@Override
-		public Integer call() throws IOException, Exception{
+		public Integer call() {
 			String chrString = convertToChr(chr);
 		    String outputFile = outputDir+"/"+chrString;
 		    NavigableSet<Pos> subset = splitSet(chr);
-		    PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(outputFile)));
 		    String chr_str;
 		    String ref;
 		    int seq;
 		    String query;
 		    Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
-		    for(Pos pos: subset){
+			try(PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(outputFile)))){
+				for(Pos pos: subset){
 		               chr_str = pos.getChr();
 		               seq = pos.getSeq();
 		               ref = pos.getRef();
@@ -298,8 +299,13 @@ public class TabixBasedJoin {
 		              logger.debug("output result is {}",result_builder.toString());
 		      	pw.println(result_builder.toString());
 		    }
-		    pw.close();
+		   
 		    return WRITE_SUCCESS;
+		}catch(Exception e){
+			logger.error("Write Thread fail {}",e);
+			return -1;
+			}
+			
 		}
 		
 	}// end of writeToFileAsTPed class
