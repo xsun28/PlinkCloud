@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -34,7 +33,7 @@ private String inputFileContext;
 private String output;
 private ExecutorService threadPool;
 private int file_no;
-
+private int file_finished; 
 class Pos implements Comparable<Pos>{
 	private String chr;
 	private String ref;
@@ -160,8 +159,9 @@ class VCFReader implements Callable<Integer>{
 	@Override
 	public Integer call() throws IOException{
 		try{
-		logger.debug("Thread {} started",num);
 		extractPosToSet();
+		file_finished--;
+		logger.debug("Thread {} finished, queue size is {}, remaining task number is {}",num,pqueue.size(),file_finished);
 		}catch(Exception e){
 			logger.debug("IOE error reading VCF files");
 			e.printStackTrace();
@@ -185,7 +185,10 @@ class VCFReader implements Callable<Integer>{
 			else{
 				String[] fields = line.split("\\s");
 				String chr =  parseChr(fields[0].trim()) ;
-				if(null==chr) continue;// in case some file has blank space at the end of the file
+				if(null==chr) {
+					logger.error("in reader {}, the chr is null, input is {}",num,line);
+					continue;
+					}// in case some file has blank space at the end of the file
 				int seq = Integer.parseInt(fields[1].trim());
 				String ref = fields[3].trim();
 				String snp_id = fields[2].trim();
@@ -254,6 +257,7 @@ public PriorityQueueJoin(String input, String output){
 	File dir=new File(input);
 	String[] fileNames=dir.list();
 	file_no = fileNames.length;
+	file_finished = file_no;
 	pqueue = new PriorityBlockingQueue<Pos>(file_no);
 	threadPool = Executors.newCachedThreadPool();
 	inputFileContext = dir.getAbsolutePath()+"/";
@@ -300,8 +304,7 @@ public void TPedMerge()  {
 	Pos currentPos = null;
 	String ref = null;
 	try(PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(output)))){
-	
-	while(!pqueue.isEmpty()|| prevPos==null){
+	while(!pqueue.isEmpty()|| prevPos==null || file_finished!=0){
 		currentPos = pqueue.take();
 		currentPos.Semaphore_Unlock();
 		if(!currentPos.equals(prevPos)){
