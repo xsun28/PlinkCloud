@@ -291,14 +291,13 @@ private StringBuilder constructResult(StringBuilder sb, String[] genotypes, Stri
 
 public void TPedMerge()  {
 	String[] genotypes = null;
-	
 	StringBuilder outputLine = null;
 	Pos prevPos = null;
 	Pos currentPos = null;
 	String ref = null;
 	try(PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(output)))){
-		
-	while(!pqueue.isEmpty()){
+	
+	while(!pqueue.isEmpty()|| prevPos==null){
 		currentPos = pqueue.take();
 		currentPos.Semaphore_Unlock();
 		if(!currentPos.equals(prevPos)){
