@@ -164,6 +164,7 @@ class VCFReader implements Callable<Integer>{
 		extractPosToSet();
 		}catch(Exception e){
 			logger.debug("IOE error reading VCF files");
+			e.printStackTrace();
 			return READ_FAILURE;
 		}finally{
 			reader.close();
@@ -183,6 +184,7 @@ class VCFReader implements Callable<Integer>{
 			}
 			else{
 				String[] fields = line.split("\\s");
+				if(fields[0].length()==0) logger.debug("wrong input is {}",line);
 				String chr =  parseChr(fields[0].trim()) ;
 				int seq = Integer.parseInt(fields[1].trim());
 				String ref = fields[3].trim();
@@ -218,6 +220,7 @@ class VCFReader implements Callable<Integer>{
 			return chr;
 		}
 		else{
+			logger.error("chromosome {} can't be parsed",input);
 			throw new Exception("Chromosome can't be parsed");
 			}		
 	}
@@ -280,7 +283,7 @@ private void readVCFs(ArrayList<String> nameList) throws InterruptedException{
 
 private StringBuilder constructResult(StringBuilder sb, String[] genotypes, String ref){
 	for(String genotype: genotypes){
-		if(null!= genotype){
+		if(null == genotype){
 			 sb.append("\t").append(ref+" "+ref);
 		}else{
 			sb.append("\t").append(genotype);

@@ -74,14 +74,14 @@
             <goals>
               <goal>java</goal>
             </goals>
-               <configuration>
+               <!-- <configuration>
           <mainClass>edu.emory.plinkcloud.plinkcloud.TabixBased.TabixBasedJoin</mainClass>
           <arguments>
             <argument>/home/ec2-user/data_93/bgzip/1.vcf.gz</argument>
             <argument>chr1:10000-50000</argument>
           </arguments>
        
-        </configuration>
+        </configuration> -->
           </execution>
         </executions>
      
