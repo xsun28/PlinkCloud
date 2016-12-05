@@ -273,11 +273,9 @@ public PriorityQueueJoin(String input, String output){
 }// end of PriorityQueueJoin constructor
 
 private void readVCFs(ArrayList<String> nameList) throws InterruptedException{
-	List<VCFReader> readerThreadList = new ArrayList<VCFReader>();
 	int i = 0;
 	for(String fileName:nameList)
-		readerThreadList.add(new VCFReader(fileName,i++));
-	threadPool.invokeAll(readerThreadList);
+		threadPool.submit(new VCFReader(fileName,i++));
 }
 
 private StringBuilder constructResult(StringBuilder sb, String[] genotypes, String ref){
