@@ -23,6 +23,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+
 public class PriorityQueueJoin {
 protected final Logger logger = LoggerFactory.getLogger(getClass());
 private static final int READ_SUCCESS = 1;
@@ -158,6 +160,7 @@ class VCFReader implements Callable<Integer>{
 	@Override
 	public Integer call() throws IOException{
 		try{
+		logger.debug("Thread {} started",num);
 		extractPosToSet();
 		}catch(Exception e){
 			logger.debug("IOE error reading VCF files");
