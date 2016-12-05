@@ -184,8 +184,8 @@ class VCFReader implements Callable<Integer>{
 			}
 			else{
 				String[] fields = line.split("\\s");
-				if(fields[0].length()==0) logger.debug("wrong input is {}",line);
 				String chr =  parseChr(fields[0].trim()) ;
+				if(null==chr) continue;// in case some file has blank space at the end of the file
 				int seq = Integer.parseInt(fields[1].trim());
 				String ref = fields[3].trim();
 				String snp_id = fields[2].trim();
@@ -209,7 +209,7 @@ class VCFReader implements Callable<Integer>{
 		}
 	}
 	
-	private String parseChr(String input) throws Exception{
+	private String parseChr(String input){
 		
 		Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
 		Matcher matcher = pattern.matcher(input);
@@ -221,7 +221,8 @@ class VCFReader implements Callable<Integer>{
 		}
 		else{
 			logger.error("chromosome {} can't be parsed",input);
-			throw new Exception("Chromosome can't be parsed");
+			return null;
+			//throw new Exception("Chromosome can't be parsed");
 			}		
 	}
 	
