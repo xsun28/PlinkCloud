@@ -34,6 +34,7 @@ private String output;
 private ExecutorService threadPool;
 private int file_no;
 private int file_finished; 
+//private String key;
 class Pos implements Comparable<Pos>{
 	private String chr;
 	private String ref;
@@ -304,25 +305,27 @@ public void TPedMerge()  {
 	Pos currentPos = null;
 	String ref = null;
 	try(PrintWriter pw = new PrintWriter( new BufferedWriter(new FileWriter(output)))){
-	while(!pqueue.isEmpty()|| prevPos==null || file_finished!=0){
-		currentPos = pqueue.take();
-		currentPos.Semaphore_Unlock();
-		if(!currentPos.equals(prevPos)){
+	while(file_finished>0 || prevPos==null){
+		if(!pqueue.isEmpty()){
+			currentPos = pqueue.take();				
+			currentPos.Semaphore_Unlock();
+			if(!currentPos.equals(prevPos)){
 			
-			if(null!=outputLine){
-				outputLine = constructResult(outputLine,genotypes,ref);
-				pw.println(outputLine.toString());
+				if(null!=outputLine){
+					outputLine = constructResult(outputLine,genotypes,ref);
+					pw.println(outputLine.toString());
+				}
+				outputLine = new StringBuilder();
+				outputLine.append(currentPos.getChr()).append("\t").append(currentPos.getSNP_ID())
+				.append("\t").append("0\t").append(currentPos.getSeq());			
+				genotypes = new String[file_no];
+				ref = currentPos.getRef();
+				genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
+			}else{
+				genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
 			}
-			outputLine = new StringBuilder();
-			outputLine.append(currentPos.getChr()).append("\t").append(currentPos.getSNP_ID())
-			.append("\t").append("0\t").append(currentPos.getSeq());			
-			genotypes = new String[file_no];
-			ref = currentPos.getRef();
-			genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
-		}else{
-			genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
 		}
-	}
+		}
 	}catch(IOException ioe){
 		logger.error("IOException of TPEDMerger");
 		ioe.printStackTrace();
