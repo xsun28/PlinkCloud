@@ -324,6 +324,7 @@ public void TPedMerge()  {
 			}else{
 				genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
 			}
+			prevPos = currentPos;
 		}
 		}
 	}catch(IOException ioe){
@@ -337,10 +338,10 @@ public void TPedMerge()  {
 }//end of TPedMerge
 
 public static void main(String[] args) {
-	
+	long startTime = System.currentTimeMillis();
 	PriorityQueueJoin pqj=new PriorityQueueJoin(args[0],args[1]);
 	pqj.TPedMerge();
-	
+	System.out.println("Join Execution Time: "+(System.currentTimeMillis()-startTime));
 }//end of main
 
 }
