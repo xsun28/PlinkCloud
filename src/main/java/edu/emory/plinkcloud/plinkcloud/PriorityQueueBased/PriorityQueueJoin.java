@@ -268,7 +268,7 @@ public PriorityQueueJoin(String input, String output){
 		@Override
 		public int compare(String name1,String name2){
 			int number1 = Integer.parseInt(name1.substring(0,name1.indexOf(".")));
-			int number2 = Integer.parseInt(name2.substring(0,name1.indexOf(".")));
+			int number2 = Integer.parseInt(name2.substring(0,name2.indexOf(".")));
 			return number1-number2;
 		}
 	});
