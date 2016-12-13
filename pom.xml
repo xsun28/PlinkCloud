@@ -21,23 +21,17 @@
   <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-client</artifactId>
       <version>${hadoop.version}</version>
-  </dependency>
-  <dependency>
-  <groupId>org.apache.hadoop</groupId>
-      <artifactId>mrunit</artifactId>
-      <version>1.10</version>
-      <scope>test</scope>
-  </dependency>
-   <dependency>
+  </dependency>  
+ <dependency>
   <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-minicluster</artifactId>
       <version>${hadoop.version}</version>
       <scope>test</scope>
-  </dependency>
+  </dependency> 
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>3.8.1</version>
+      <version>4.11</version>
       <scope>test</scope>
     </dependency>
     	<!-- <dependency>
@@ -60,13 +54,13 @@
 			<scope>compile</scope>
 		</dependency>
   </dependencies>
-  <repositories>
+ <!--  <repositories>
 	<repository>
 			<id>nexus</id>
 			<url>http://34.192.118.190:8081/repository/plinkcloud/</url>
 		</repository>
 	
-	</repositories>
+	</repositories> -->
   <build>
     <plugins>
     	<!-- we are compiling at 1.8 level -->
