@@ -1,0 +1,115 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>edu.emory.plinkcloud</groupId>
+  <artifactId>plinkcloud</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>plinkcloud</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>1.7</java.version>
+    <hadoop.version>2.6.0</hadoop.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.11</version>
+      <scope>test</scope>
+    </dependency>
+   <!--  	<dependency>
+			<groupId>nexus</groupId>
+			<artifactId>samtools</artifactId>
+			<version>1.110</version>
+		</dependency> -->
+    <dependency>
+			    <groupId>org.slf4j</groupId>
+   				 <artifactId>slf4j-api</artifactId>
+    			<version>1.7.21</version>
+			<type>jar</type>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.1.1</version>
+			<type>jar</type>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+		<groupId>org.apache.hadoop</groupId>
+		<artifactId>hadoop-client</artifactId>
+		<version>${hadoop.version}</version>
+		</dependency>
+		<dependency>
+		<groupId>
+		org.apache.hadoop
+		</groupId>
+		<artifactId>
+		hadoop-minicluster
+		</artifactId>	
+		<version>
+		${hadoop.version}
+		</version>
+		</dependency>
+  </dependencies>
+ <!--  <repositories>
+	<repository>
+			<id>nexus</id>
+			<url>http://34.192.118.190:8081/repository/plinkcloud/</url>
+		</repository>
+	
+	</repositories> -->
+  <build>
+  <finalName>PlinkCloud</finalName>
+    <plugins>
+    	<!-- we are compiling at 1.8 level -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
+					<encoding>${project.build.sourceEncoding}</encoding>
+			<!--		<includes>
+						<include>com/omicseq/web/controller/HomeController.java</include>
+					</includes>  --> 
+				</configuration>
+			</plugin>
+			<plugin>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-jar-plugin</artifactId>
+			<version>2.5</version>
+			</plugin>
+     <!--  <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>1.5.0</version>
+        <executions>
+          <execution>
+	<phase>compile</phase>
+            <goals>
+              <goal>java</goal>
+            </goals>
+             <configuration>
+          <mainClass>edu.emory.plinkcloud.plinkcloud.TabixBased.TabixBasedJoin</mainClass>
+          <arguments>
+            <argument>/home/ec2-user/data_93/bgzip/1.vcf.gz</argument>
+            <argument>chr1:10000-50000</argument>
+          </arguments>
+       
+        </configuration> 
+          </execution>
+        </executions>
+     
+      </plugin> -->
+    </plugins>
+  </build>
+  
+</project>

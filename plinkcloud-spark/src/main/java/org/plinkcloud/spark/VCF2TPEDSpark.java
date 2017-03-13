@@ -1,0 +1,421 @@
+package org.plinkcloud.spark;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.spark.Partitioner;
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaNewHadoopRDD;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.storage.StorageLevel;
+import scala.Tuple2;
+
+public class VCF2TPEDSpark {
+	
+
+		
+	public static class ChrPosPartitioner extends Partitioner{
+		private int num;
+		List<String> boundaries;                            //boundaries of the partition
+		
+		public ChrPosPartitioner(List<String> boundaries){
+			this.boundaries =  boundaries;
+			num = boundaries.size()+1;
+		}
+		
+		
+		@Override
+		public int numPartitions(){
+			return num;
+		}
+		
+		@Override
+		public int getPartition(Object key){
+			String chr_pos = (String) key;
+			for(int i = 0; i<boundaries.size();i++){
+				if(chr_pos.compareTo(boundaries.get(i))<0)
+					return i;
+			}
+			return num-1;			
+		}
+		
+		@Override
+		public boolean equals(Object other){
+			if(!(other instanceof ChrPosPartitioner))
+				return false;
+			ChrPosPartitioner p_other = (ChrPosPartitioner) other;
+			if(this.numPartitions() == p_other.numPartitions())
+				return true;
+			else return false;
+		}
+		
+	}
+	
+	public static class Filter implements Function<Tuple2<String,String>, Boolean>{
+		
+		@Override
+		public Boolean call(Tuple2<String,String> input){
+			if(null == input) return false;
+			else return true;
+		}
+	}
+	
+//	public static class Filter implements Function<String, Boolean>{
+//		
+//		private enum Quality {
+//			NULL,Q10,Q20,PASS;	
+//		};
+//		
+//		Quality quality;
+//		private int start_chr, end_chr;
+//		
+//		public Filter(String start, String end, String qual){
+//			start_chr = parseChrnum(start);
+//			end_chr = parseChrnum(end);
+//			quality = getQuality(qual);
+//		}
+//		
+//		private Quality getQuality(String line){
+//			if(line.startsWith("#")) return null; // header
+//			if(line.contains("PASS")) return Quality.PASS;
+//			else if(line.contains("q20")) return Quality.Q10;
+//			else if(line.contains("q10")) return Quality.Q20;
+//			else return Quality.NULL;
+//			
+//		}
+//		
+//		public int parseChrnum(String chr){
+//			int chrm;
+//			if(chr.equalsIgnoreCase("X")) chrm = 23;
+//			else if (chr.equalsIgnoreCase("Y")) chrm = 24;
+//			else if (chr.equalsIgnoreCase("M")) chrm = 25;
+//			else chrm = Integer.parseInt(chr);
+//			return chrm;
+//		}
+//		
+//		@Override
+//		public Boolean call(String line){
+//			if(line.startsWith("#")) 
+//				return false;
+//			Quality qual = getQuality(line);
+//			if(null == qual || qual.compareTo(quality) < 0)
+//				return false;
+//			String[] fields =  line.split("\\s+");						
+//			String chrm = fields[0].substring(fields[0].indexOf("r")+1).trim();
+//			int chr_num = parseChrnum(chrm);
+//			if(chr_num < start_chr || chr_num > end_chr)
+//				return false;
+//			return true;
+//		}
+//	}
+	
+	public static class CombineMap implements Function<Tuple2<String,Iterable<String>>, String >{  // the input row key is chr_pos and value is a collection of ind_id,rs,ref,genotype. Convert it into output row 
+		private int total_num;            //total individual number
+		public CombineMap(int num){
+			total_num = num;
+		}
+		
+		@Override
+		public String call(Tuple2<String,Iterable<String>> input_row){
+			StringBuilder result = new StringBuilder();
+			String[] chr_pos = getChrPos(input_row._1);
+			String ref = "", rs;
+			String[] genotypes = new String[total_num];
+			boolean first = true;
+			for(String record: input_row._2){
+				String[] fields = record.split(",");
+				if(first){
+					ref = fields[2];
+					rs = fields[1];
+					result.append(chr_pos[0]+"\t").append(rs).append("\t0\t").append(chr_pos[1]+"\t");
+					first = false;
+				}
+				int ind_id = Integer.parseInt(fields[0])-1;
+				genotypes[ind_id] = fields[3];
+			}
+			for(String genotype: genotypes){
+				if(null == genotype) 
+					result.append(ref+" ").append(ref+" ");	
+				else
+					result.append(genotype+" ");
+			} 
+			return result.toString();
+		}
+		
+		private String[] getChrPos(String line){
+			String chr_pos[] = new String[2];  //row_key[0] = chr, row_key[1] = pos
+			String tmp1 = line.substring(0,line.indexOf("-"));
+			String tmp2 = line.substring(line.indexOf("-")+1);
+			int chr = Integer.parseInt(tmp1);
+			long pos = Long.parseLong(tmp2);
+			chr_pos[0] = String.valueOf(chr);
+			chr_pos[1] = String.valueOf(pos);
+			return chr_pos;
+		}
+		
+	
+	}
+	public static class ConvertMap implements Function2<InputSplit,  Iterator<Tuple2<LongWritable, Text>>, Iterator<Tuple2<String, String>>>{  //convert the raw row into chr-pos as row key, individual_num,rs,ref,genotypes as value
+		
+		private static final int POS_LENGTH = 10;
+		private static final int CHR_LENGTH = 2;
+		private enum Quality {
+			NULL,Q10,Q20,PASS;	
+		};
+		
+		Quality quality;
+		private int start_chr, end_chr;
+		
+		public ConvertMap(String start, String end, String qual){
+			start_chr = parseChrnum(start);
+			end_chr = parseChrnum(end);
+			quality = getQuality(qual);
+		}
+		
+		private Quality getQuality(String line){
+			if(line.startsWith("#")) return null; // header
+			if(line.contains("PASS")) return Quality.PASS;
+			else if(line.contains("q20")) return Quality.Q10;
+			else if(line.contains("q10")) return Quality.Q20;
+			else return null;
+			
+		}
+		
+		@Override
+		public  Iterator<Tuple2<String, String>> call(InputSplit split, final Iterator<Tuple2<LongWritable, Text>> lines ){
+			
+			FileSplit fileSplit = (FileSplit) split;
+			String fileName = fileSplit.getPath().getName();
+			final String ind_id = fileName.substring(0,fileName.indexOf("."));
+			return new Iterator<Tuple2<String, String>>() {
+                @Override
+                public boolean hasNext() {
+                    return lines.hasNext();
+                }
+                @Override
+                public Tuple2<String, String> next() {
+                    Tuple2<LongWritable, Text> entry = lines.next();
+                    String line = entry._2().toString(); 
+                    Quality qual = getQuality(line);
+        			if(null == qual || qual.compareTo(quality) < 0) 
+        				return null;
+                    String[] fields = line.split("\\s+");
+                    String chrm = fields[0].substring(fields[0].indexOf("r")+1).trim();
+                    int chr_num = parseChrnum(chrm);
+                    if(chr_num < start_chr || chr_num > end_chr)
+        				return null;
+                    String genotype = parseGenotype(line);
+                    String pos = fields[1].trim();
+                    String rs =  fields[2].trim();
+                    String ref = fields[3].trim();
+                    //String[] alts = fields[4].trim().split(",");
+                    String rowKey = getRowKey(String.valueOf(chr_num),pos);
+                    StringBuilder value = new StringBuilder().append(ind_id+",").append(rs+",")
+        						.append(ref+",").append(genotype);
+                    return new Tuple2<String, String>(rowKey,value.toString());
+                   
+                }
+            };		
+		}
+		
+	
+		public int parseChrnum(String chr){
+			int chrm;
+			if(chr.equalsIgnoreCase("X")) chrm = 23;
+			else if (chr.equalsIgnoreCase("Y")) chrm = 24;
+			else if (chr.equalsIgnoreCase("M")) chrm = 25;
+			else chrm = Integer.parseInt(chr);
+			return chrm;
+		}
+		
+		private String parseGenotype(String line){
+			
+			StringBuilder genotype = new StringBuilder();
+			String numbered_genotype = null;//1/0, 1/1...
+			Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
+			String [] fields = line.split("\\s");
+			String genotype_field = fields[9].trim();
+			String [] alts = fields[4].trim().split(",");
+			String ref = fields[3].trim();
+			Matcher matcher = genotypePattern.matcher(genotype_field);
+			if(matcher.find())
+				numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
+			String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
+			for (int i=0;i<genotype_numbers.length;i++){
+				int number = Integer.parseInt(genotype_numbers[i].trim());
+				if(number==0)
+					genotype.append(ref).append(" ");
+				else
+					genotype.append(alts[number-1]).append(" ");	
+			}
+			return genotype.toString().trim();
+		}
+		
+		public String getRowKey(String chr, String pos){
+			char[] pos_array = new char[POS_LENGTH];
+			char[] chr_array = new char[CHR_LENGTH];
+			Arrays.fill(pos_array, '0');
+			Arrays.fill(chr_array, '0');
+			int pos_start_offset = POS_LENGTH - pos.length();
+			int chr_start_offset = CHR_LENGTH - chr.length();
+			System.arraycopy(pos.toCharArray(), 0, pos_array, pos_start_offset, pos.length());
+			System.arraycopy(chr.toCharArray(), 0, chr_array, chr_start_offset, chr.length());
+			return  String.valueOf(chr_array)+"-"+ String.valueOf(pos_array);			
+		}
+		
+		
+	}
+	
+//	public static class ConvertMap implements PairFunction<String, String, String>{  //convert the raw row into chr-pos as row key, individual_num,rs,ref,genotypes as value
+//		
+//		private static final int POS_LENGTH = 10;
+//		private static final int CHR_LENGTH = 2;
+//		private String ind_num;
+//		public ConvertMap(String num){
+//			ind_num = num;
+//		}
+//		
+//		@Override
+//		public Tuple2<String,String> call(String line){
+//			String[] fields = line.split("\\s+");
+//			String chrm = fields[0].substring(fields[0].indexOf("r")+1).trim();
+//			int chr_num = parseChrnum(chrm);
+//			String genotype = parseGenotype(line);
+//			String pos = fields[1].trim();
+//			String rs =  fields[2].trim();
+//			String ref = fields[3].trim();
+//			//String[] alts = fields[4].trim().split(",");
+//			String rowKey = getRowKey(String.valueOf(chr_num),pos);
+//			StringBuilder value = new StringBuilder().append(ind_num+",").append(rs+",")
+//						.append(ref+",").append(genotype);
+//			return new Tuple2(rowKey,value.toString());
+//		}
+//		
+//		public int parseChrnum(String chr){
+//			int chrm;
+//			if(chr.equalsIgnoreCase("X")) chrm = 23;
+//			else if (chr.equalsIgnoreCase("Y")) chrm = 24;
+//			else if (chr.equalsIgnoreCase("M")) chrm = 25;
+//			else chrm = Integer.parseInt(chr);
+//			return chrm;
+//		}
+//		
+//		private String parseGenotype(String line){
+//			
+//			StringBuilder genotype = new StringBuilder();
+//			String numbered_genotype = null;//1/0, 1/1...
+//			Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
+//			String [] fields = line.split("\\s");
+//			String genotype_field = fields[9].trim();
+//			String [] alts = fields[4].trim().split(",");
+//			String ref = fields[3].trim();
+//			Matcher matcher = genotypePattern.matcher(genotype_field);
+//			if(matcher.find())
+//				numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
+//			String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
+//			for (int i=0;i<genotype_numbers.length;i++){
+//				int number = Integer.parseInt(genotype_numbers[i].trim());
+//				if(number==0)
+//					genotype.append(ref).append(" ");
+//				else
+//					genotype.append(alts[number-1]).append(" ");	
+//			}
+//			return genotype.toString().trim();
+//		}
+//		
+//		public String getRowKey(String chr, String pos){
+//			char[] pos_array = new char[POS_LENGTH];
+//			char[] chr_array = new char[CHR_LENGTH];
+//			Arrays.fill(pos_array, '0');
+//			Arrays.fill(chr_array, '0');
+//			int pos_start_offset = POS_LENGTH - pos.length();
+//			int chr_start_offset = CHR_LENGTH - chr.length();
+//			System.arraycopy(pos.toCharArray(), 0, pos_array, pos_start_offset, pos.length());
+//			System.arraycopy(chr.toCharArray(), 0, chr_array, chr_start_offset, chr.length());
+//			return  String.valueOf(chr_array)+"-"+ String.valueOf(pos_array);			
+//		}
+//		
+//		
+//	}
+	
+	public static List<String> getPartitionBoundaries(Map<String, String> samples, int region_num){
+		int boundary_num = region_num -1;
+		List<String> boundaries = new ArrayList<>(boundary_num);
+		int step = (samples.size()+1)/region_num;
+		int i = 0;
+		for(String key: samples.keySet()){
+			if((++i)%step == 0) boundaries.add(key);
+		}
+		return boundaries;		
+	}
+	
+
+	
+	public static void main(String[] args) {  //spark-submit --class org.plinkcloud.spark.VCF2TPEDSpark --master yarn --cluster-mode cluster plinkcloud-spark.jar VoTECloud/input/ Spark/output 3 1-3 PASS
+		long start_time = System.currentTimeMillis();
+		String input_path = args[0];
+		String output_path = args[1];
+		int ind_num = Integer.parseInt(args[2]);
+		String chr_range = args[3].trim();
+		String start_chr = chr_range.substring(0,chr_range.indexOf("-"));
+		String end_chr = chr_range.substring(chr_range.indexOf("-")+1);
+//		double sampleRate = Double.parseDouble(args[4]);  //0.0005
+//		String quality = args[5];
+		String quality = args[4];
+//		SparkConf conf = new SparkConf().setMaster("yarn-client").setAppName("plinkcloud-spark");
+		SparkConf conf = new SparkConf().setAppName("plinkcloud-spark");  //set master model on command line 
+		conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
+		conf.set("spark.kyro.registrationRequired", "true");
+//		conf.registerKryoClasses(new Class<?>[]{FilterMap.class,CombineMap.class,Filter.class});
+		JavaSparkContext sc = new JavaSparkContext(conf);
+		JavaPairRDD<LongWritable, Text> javaPairRDD = sc.newAPIHadoopFile(
+			    input_path, 
+			    TextInputFormat.class, 
+			    LongWritable.class, 
+			    Text.class, 
+			    new Configuration()
+			);
+		JavaNewHadoopRDD<LongWritable, Text> hadoopRDD = (JavaNewHadoopRDD) javaPairRDD;
+		JavaPairRDD<String, String> union_RDD = hadoopRDD.mapPartitionsWithInputSplit(new ConvertMap(start_chr,end_chr,quality), true).filter(new Filter()).mapToPair(
+				new PairFunction<Tuple2<String, String>,String,String>(){
+					@Override
+					public Tuple2<String, String> call(Tuple2<String, String> line){
+						return new Tuple2(line._1,line._2);
+					}
+				}
+				);
+//		union_RDD.saveAsTextFile(output_path);
+//		JavaPairRDD<String,String>[] file_RDD_array = new JavaPairRDD[ind_num];
+//		for(int i =0; i<ind_num; i++){
+//			JavaRDD<String> input = sc.textFile(input_path+(i+1)+".bz2");
+//			file_RDD_array[i] = input.filter(new Filter(start_chr, end_chr, quality)).mapToPair(new ConvertMap(String.valueOf(i+1)));
+//		}
+//		JavaPairRDD<String, String> union_RDD = sc.union(file_RDD_array).persist(StorageLevel.MEMORY_AND_DISK()); 
+//		JavaPairRDD<String,String> sample = union_RDD.sample(false, sampleRate);    //get the samples for partitioning the RDD into approximately equal partition
+//		Map<String, String> sample_map = sample.collectAsMap();
+//		List<String> boundaries = getPartitionBoundaries(sample_map, ind_num);
+//		JavaPairRDD<String, String> partitioned_RDD = union_RDD.partitionBy(new ChrPosPartitioner(boundaries));
+//		JavaRDD<String> result_RDD = partitioned_RDD.groupByKey(ind_num).sortByKey().map(new CombineMap(ind_num));  //first group then sort with ind_num parallel tasks assigned to executors. This will let let sort be local
+		JavaRDD<String> result_RDD = union_RDD.groupByKey(ind_num).sortByKey().map(new CombineMap(ind_num));   
+		result_RDD.saveAsTextFile(output_path);
+		long end_time = System.currentTimeMillis();
+		System.out.println("Running Plinkcloud-Spark on "+ind_num+" files took "+(end_time-start_time)/1000+" seconds");
+	}
+
+}

@@ -1,36 +1,41 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>edu.emory.plinkcloud</groupId>
-  <artifactId>plinkcloud</artifactId>
+  <artifactId>plinkcloud-parent</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
+  <packaging>pom</packaging>
 
-  <name>plinkcloud</name>
+  <name>plinkcloud-parent</name>
   <url>http://maven.apache.org</url>
+<modules>
 
+    <module>plinkcloud-mapreduce</module>
+    <module>plinkcloud-priorityqueue</module>
+    <module>plinkcloud-hbase</module>
+    <module>plinkcloud-spark</module>
+  </modules>
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <java.version>1.8</java.version>
-  </properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<java.version>1.7</java.version>
+		<hadoop.version>2.6.0</hadoop.version>
+		<emr.version>2.7.3</emr.version>
+	</properties>
 
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
-      <scope>test</scope>
-    </dependency>
-    	<dependency>
-			<groupId>nexus</groupId>
-			<artifactId>samtools</artifactId>
-			<version>1.110</version>
+	<dependencies>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.11</version>
+			<scope>test</scope>
 		</dependency>
-    <dependency>
+		<!-- <dependency> <groupId>nexus</groupId> <artifactId>samtools</artifactId> 
+			<version>1.110</version> </dependency> -->
+		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.6</version>
+			<version>1.7.21</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
@@ -41,16 +46,10 @@
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
-  </dependencies>
-  <repositories>
-	<repository>
-			<id>nexus</id>
-			<url>http://34.192.118.190:8081/repository/plinkcloud/</url>
-		</repository>
 	
-	</repositories>
-  <build>
-    <plugins>
+	</dependencies>
+	  <build>
+ <plugins>
     	<!-- we are compiling at 1.8 level -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -64,6 +63,7 @@
 					</includes>  --> 
 				</configuration>
 			</plugin>
+		
      <!--  <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
@@ -88,5 +88,4 @@
       </plugin> -->
     </plugins>
   </build>
-  
 </project>
