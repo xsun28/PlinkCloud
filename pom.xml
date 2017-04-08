@@ -15,12 +15,12 @@
     <module>plinkcloud-priorityqueue</module>
     <module>plinkcloud-hbase</module>
     <module>plinkcloud-spark</module>
+    <module>plincloud-vcf-simulator</module>
   </modules>
   <properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<java.version>1.7</java.version>
 		<hadoop.version>2.6.0</hadoop.version>
-		<emr.version>2.7.3</emr.version>
 	</properties>
 
 	<dependencies>

@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -25,6 +26,7 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.mapreduce.HFileOutputFormat2;
 import org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.compress.BZip2Codec;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.Lz4Codec;
 import org.apache.hadoop.mapreduce.Job;
@@ -56,28 +59,40 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 		private Quality qual_filter;
 		private double rate;         //sampling rate
 		private long records = 0;
-		private long kept = 1;      //
+		private long kept = 1;
+		private boolean ordered;
+		private Random random;
+		
 		@Override
 		protected void setup(Context context){
 			Configuration conf = context.getConfiguration();
 			qual_filter =  Enum.valueOf(Quality.class, conf.get("quality").trim().toUpperCase());
 			rate = Double.parseDouble(conf.get("samplerate").trim());
+			ordered = conf.getBoolean("ordered", true);
+			random = new Random();
 		}
 		
 		@Override 
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
-			TextParser parser = new TextParser(value.toString());
+			TextParser parser = new TextParser(value.toString());	
 			Quality qual = parser.getQuality();
 			if(null != qual && qual.compareTo(qual_filter) >= 0){
 				records++;
 				String rowKey = parser.getRowkey();
-	            if ((double) kept / (double)records < rate) {
-				kept++;
-				context.write(new Text(rowKey), NullWritable.get());
-					}
+				boolean sample = false;
+				if(ordered){
+					sample = ((double) kept / (double)records) < rate;
+				}else{
+					double random_num = random.nextDouble();
+					sample = random_num*100 < rate*100;
+				}
+				if (sample) {
+					kept++;
+					context.write(new Text(rowKey), NullWritable.get());
+				}
 			}
 		}		
-	}
+	}// end of VCF Sampler map
 	
 	protected static class VCFSampleReducer extends Reducer<Text,NullWritable,Text,NullWritable>{
 		private int file_no;
@@ -97,9 +112,9 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 					samplenums = 0;
 				}
 			}
-		}
-	
-	}
+			
+		}// end of reduce	
+	}// end of reducer
 		
 	protected static class BulkLoadingMapper extends Mapper<LongWritable,Text,ImmutableBytesWritable,Put>{
 		private byte[] family = null;
@@ -176,23 +191,35 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 			mos.write(NullWritable.get(), new Text(result.toString()),startRow);
 		}
 		
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			mos.close();
+		}
+		
 	}//end of export mapper
 	
 	
-	private List<String> getRegionBoundaries(Configuration conf, String sample_path, int region_num) throws IOException{
+	private List<String> getRegionBoundaries(Configuration conf, String sample_path, int region_num) throws IOException{   //the result region is 0 to first_boundary, ....., last boundary to maxmium
 		int boundary_num = region_num -1;
 		List<String> boundaries = new ArrayList<>(boundary_num);
 		List<String> temp = new ArrayList<>();
 		FileSystem fs = FileSystem.get(URI.create(sample_path),conf);
-		BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(new Path(sample_path))));
-		String line = "";
-		while(null != ( line = reader.readLine()))
-			temp.add(line);	
-		int step = (temp.size()+1)/region_num;
-		for(int i = 0; i<temp.size(); i++){
-			if((i+1)%step == 0) boundaries.add(temp.get(i));
+		if(fs.exists(new Path(sample_path))){													//if there is sampled records
+			BufferedReader reader = new BufferedReader(new InputStreamReader(fs.open(new Path(sample_path))));
+			String line = "";
+			while(null != ( line = reader.readLine()))
+				temp.add(line);	
+			int step = (temp.size()+1)/region_num;
+			for(int i = 0; i<temp.size(); i++){
+				if((i+1)%step == 0) boundaries.add(temp.get(i));
+			}
+		}else{
+			TextParser parser = new TextParser();
+			String boundary = parser.getRowKey("0", "0");    //if no sampleout boundary, use 00-000000000 as the boundary
+			boundaries.add(boundary);
 		}
-		return boundaries;		
+
+		return boundaries;
 	}
 	
 	private void createTable(Admin admin,List<String> boundaries)throws IOException{
@@ -207,6 +234,7 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 		
 		HTableDescriptor desc = new HTableDescriptor(TableName.valueOf("TPED"));
 		HColumnDescriptor col_desc = new HColumnDescriptor(Bytes.toBytes("individuals"));
+//		col_desc.setCompressionType(Compression.Algorithm.BZIP2);
 		desc.addFamily(col_desc);
 		admin.createTable(desc,boundaries_array);
 		admin.close();
@@ -235,76 +263,89 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 		String chr_range = args[5].trim();
 		String start_chr = chr_range.substring(0,chr_range.indexOf("-"));
 		String end_chr = chr_range.substring(chr_range.indexOf("-")+1);
+		boolean ordered = Boolean.valueOf(args[6]);
+		conf.set("startchr", start_chr);
+		conf.set("endchr", end_chr);
+		conf.setBoolean("ordered", ordered);
 		String[] row_range = getRowRange(start_chr,end_chr);
-		int region_num = Integer.parseInt(args[3].trim())/3;
+		int region_num = Integer.parseInt(args[3].trim())/3;  //keep each region to hold approximately 3 input file's size data. The region size should around 1G
 		region_num = region_num > 1? region_num : 2;   //if region num 
 		conf.setBoolean("mapreduce.map.speculative", false);
 		conf.setBoolean("mapreduce.reduce.speculative", false);  //turn off the speculative execution
-		
-		//sample job to get boundaries
-		Job sample_job =  Job.getInstance(conf,"Sample Region Boundaries");
-		sample_job.setJarByClass(getClass());
-		FileInputFormat.addInputPath(sample_job, inputPath);
-		FileOutputFormat.setOutputPath(sample_job,sample_outputPath);
-		sample_job.setMapperClass(VCFSampleMapper.class);
-		sample_job.setReducerClass(VCFSampleReducer.class);
-		sample_job.setOutputKeyClass(Text.class);
-		sample_job.setOutputValueClass(NullWritable.class);
-		sample_job.setNumReduceTasks(1);
-		sample_job.getConfiguration().setBoolean("mapred.compress.map.output", true);
-		sample_job.getConfiguration().setClass("mapred.map.output.compression.codec", Lz4Codec.class, CompressionCodec.class);
-		code = sample_job.waitForCompletion(true)?0:1;
-		
-		
-		//Create TPED table with predefined boundaries
-		String sample_file = new StringBuilder().append(outputPath)
-				.append("/sample/part-r-00000").toString();
-		System.out.println("sample_file "+sample_file);
-		List<String> boundaries =  getRegionBoundaries(conf,sample_file,region_num);
+		conf.setDouble("mapreduce.job.reduce.slowstart.completedmaps", 0.98);  //set the reduce slow start to 50% of completed map tasks
+
 		Connection connection = ConnectionFactory.createConnection(conf);
 		Admin admin = connection.getAdmin();
-		createTable(admin,boundaries);
+		TableName table_name = TableName.valueOf("TPED");
+		if(!admin.tableExists(table_name)){  //if table exists, all records have been loaded into database, skip the sampling and bulk loading
 		
-		//Bulk Load Job
-		Job bulk_load_job = Job.getInstance(conf,"Bulk_Load");
-		bulk_load_job.setJarByClass(getClass());
-		TableMapReduceUtil.addDependencyJars(bulk_load_job);   //distribute the required dependency jars to the cluster nodes
-		FileInputFormat.addInputPath(bulk_load_job, inputPath);
-	    Path tempPath = new Path("temp/bulk");	    
-	    FileOutputFormat.setOutputPath(bulk_load_job, tempPath);
-	    bulk_load_job.setMapperClass(BulkLoadingMapper.class);
-	    bulk_load_job.setMapOutputKeyClass(ImmutableBytesWritable.class);
-	    bulk_load_job.setMapOutputValueClass(Put.class);
-//	    bulk_load_job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "TPED");
-//	    bulk_load_job.setNumReduceTasks(0);
-//	    bulk_load_job.setOutputFormatClass(TableOutputFormat.class);
-//	    bulk_load_job.waitForCompletion(true);
-//	    connection.close();
+			//sample job to get boundaries
+			Job sample_job =  Job.getInstance(conf,"Sample Region Boundaries");
+			sample_job.setJarByClass(getClass());
+			FileInputFormat.addInputPath(sample_job, inputPath);
+			FileOutputFormat.setOutputPath(sample_job,sample_outputPath);
+			sample_job.setMapperClass(VCFSampleMapper.class);
+			sample_job.setReducerClass(VCFSampleReducer.class);
+			sample_job.setOutputKeyClass(Text.class);
+			sample_job.setOutputValueClass(NullWritable.class);
+			sample_job.setNumReduceTasks(1);
+			sample_job.getConfiguration().setBoolean("mapred.compress.map.output", true);
+			sample_job.getConfiguration().setClass("mapred.map.output.compression.codec", Lz4Codec.class, CompressionCodec.class);
+			LazyOutputFormat.setOutputFormatClass(sample_job, TextOutputFormat.class);   //if sampling doesn't have any sample, don't create the sample file.
+			code = sample_job.waitForCompletion(true)?0:1;
+		
+		
+			//Create TPED table with predefined boundaries
+			String sample_file = new StringBuilder().append(outputPath)
+					.append("/sample/part-r-00000").toString();
+			List<String> boundaries =  getRegionBoundaries(conf,sample_file,region_num);		
+			createTable(admin,boundaries);
+		
+			//Bulk Load Job
+			conf.setDouble("mapreduce.job.reduce.slowstart.completedmaps", 0.6);   // lower the value cause total partitioner reducer has much more to write
+			Job bulk_load_job = Job.getInstance(conf,"Bulk_Load");
+			bulk_load_job.setJarByClass(getClass());
+			TableMapReduceUtil.addDependencyJars(bulk_load_job);   //distribute the required dependency jars to the cluster nodes
+			FileInputFormat.addInputPath(bulk_load_job, inputPath);
+			Path tempPath = new Path("temp/bulk");	    
+			FileOutputFormat.setOutputPath(bulk_load_job, tempPath);
+			bulk_load_job.setMapperClass(BulkLoadingMapper.class);
+			bulk_load_job.setMapOutputKeyClass(ImmutableBytesWritable.class);
+			bulk_load_job.setMapOutputValueClass(Put.class);
+//	    	bulk_load_job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "TPED");
+//	    	bulk_load_job.setNumReduceTasks(0);
+//	    	bulk_load_job.setOutputFormatClass(TableOutputFormat.class);
+//	    	bulk_load_job.waitForCompletion(true);
+//	    	connection.close();
 	  
-	    Table TPED_table = connection.getTable(TableName.valueOf("TPED"));
-	    RegionLocator regionLocator = connection.getRegionLocator(TableName.valueOf("TPED"));
-	    try{
-	    	HFileOutputFormat2.configureIncrementalLoad(bulk_load_job, TPED_table, regionLocator);
-	    	code = bulk_load_job.waitForCompletion(true)?0:2;  //map-reduce to generate the HFiles under the tempPath 
-	    	FsShell shell=new FsShell(conf);
-	        shell.run(new String[]{"-chown","-R","hbase:hbase","temp/"}); 
-	    	LoadIncrementalHFiles loader = new LoadIncrementalHFiles(conf);
-	    	loader.doBulkLoad(tempPath, admin, TPED_table, regionLocator);	
-	    }finally{
-	    	//FileSystem.get(conf).delete(tempPath, true);   //delete the temporary HFiles
-	    	admin.close();
-	    	regionLocator.close();
-	    	TPED_table.close();
-	    	connection.close();
-	    }
-	    
+			Table TPED_table = connection.getTable(TableName.valueOf("TPED"));
+			RegionLocator regionLocator = connection.getRegionLocator(TableName.valueOf("TPED"));
+			try{
+				HFileOutputFormat2.configureIncrementalLoad(bulk_load_job, TPED_table, regionLocator);
+				code = bulk_load_job.waitForCompletion(true)?0:2;  //map-reduce to generate the HFiles under the tempPath 
+				FsShell shell=new FsShell(conf);
+				shell.run(new String[]{"-chown","-R","hbase:hbase","temp/"}); 
+				LoadIncrementalHFiles loader = new LoadIncrementalHFiles(conf);
+				loader.doBulkLoad(tempPath, admin, TPED_table, regionLocator);	
+			}finally{
+				FileSystem.get(conf).delete(new Path("temp"), true);   //delete the temporary HFiles
+				admin.close();
+				regionLocator.close();
+				TPED_table.close();
+				connection.close();
+			}
+		}// end if table already exists
+		
 	    //Export to TPED files
 	    Job export_job = Job.getInstance(conf,"Export to TPED");
 	    export_job.setJarByClass(getClass());
 	    TableMapReduceUtil.addDependencyJars(export_job);
 	    Scan scan = new Scan(Bytes.toBytes(row_range[0]),Bytes.toBytes(row_range[1]));    // scan with start row and stop row
+	    scan.setCacheBlocks(false);  //disable block caching on the regionserver side because mapreduce is sequential reading.
 	    TableMapReduceUtil.initTableMapperJob("TPED", scan, ExportMapper.class, NullWritable.class,Text.class,export_job);
 	    FileOutputFormat.setOutputPath(export_job, result_outputPath);
+//	    FileOutputFormat.setCompressOutput(export_job, true);
+//	    FileOutputFormat.setOutputCompressorClass(export_job, BZip2Codec.class);
 	    LazyOutputFormat.setOutputFormatClass(export_job, TextOutputFormat.class);
 	    export_job.setNumReduceTasks(0);							//no reduce task
 		code = export_job.waitForCompletion(true)?0:3;	
@@ -312,8 +353,11 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 	    
 	}
 	
-	public static void main(String [] args)throws Exception{   //  hadoop jar plinkcloud-hbase.jar org.plinkcloud.hbase.HBaseVCF2TPED VoTECloud/input/  HBase 0.0001 3 PASS 1-22 
+	public static void main(String [] args)throws Exception{   //  hadoop jar plinkcloud-hbase.jar org.plinkcloud.hbase.HBaseVCF2TPED VoTECloud/input/  HBase 0.0001 3 PASS 1-22 true 
+		//long start_time = System.currentTimeMillis();
 		int exit_code = ToolRunner.run(new HBaseVCF2TPED(), args);
+		//long end_time = System.currentTimeMillis();
+		//System.out.println("plinkcloud-hbase running time is "+(end_time-start_time)%1000+" seconds");
 		System.exit(exit_code);
 	}
 

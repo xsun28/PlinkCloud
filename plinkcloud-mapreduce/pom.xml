@@ -12,7 +12,9 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>plinkcloud-mapreduce</name>
   <url>http://maven.apache.org</url>
-
+<properties>
+		<emr.version>2.7.3</emr.version>
+	</properties>
   <dependencies>
   
     <dependency>
@@ -39,14 +41,14 @@
     <finalName>plinkcloud-mapreduce</finalName>
  <plugins>
     
-			<plugin>
+		<!--  	<plugin>
 			<groupId>org.apache.maven.plugins</groupId>
 			<artifactId>maven-jar-plugin</artifactId>
 			<version>2.5</version>
 				  <configuration>
   <archive>
     <manifest>
-	<!--  <mainClass>org.plinkcloud.mapreduce.HDVCF2TPEDOrdered</mainClass>  -->
+	<mainClass>org.plinkcloud.mapreduce.MRVCF2TOED</mainClass> 
     </manifest>
   </archive>
 </configuration>
@@ -56,7 +58,7 @@
           <phase>package</phase>
    </execution>
         </executions> 
-			</plugin>
+			</plugin> 
 			
 			 <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
@@ -68,7 +70,7 @@
            <appendAssemblyId>false</appendAssemblyId>
           <archive>
     <manifest>
-	<mainClass>org.plinkcloud.mapreduce.HDVCF2TPEDOrdered</mainClass>
+	<mainClass>org.plinkcloud.mapreduce.MRVCF2TPED</mainClass>
     </manifest>
   </archive>
         </configuration>
@@ -81,8 +83,40 @@
             </goals>
           </execution>
         </executions>
-      </plugin> 
-			
+      </plugin>  -->
+	      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <relocations>
+                <relocation>
+                  <pattern>org.apache</pattern>                               <!-- relocate org.apache and its subdirectories into shaded namespace to solve conflicts -->
+                  <shadedPattern>org.shaded.apache</shadedPattern>
+                   <pattern>com.google</pattern>
+                  <shadedPattern>com.shaded.google</shadedPattern>
+                 <!--   <excludes>
+                    <exclude>org.codehaus.plexus.util.xml.Xpp3Dom</exclude>
+                    <exclude>org.codehaus.plexus.util.xml.pull.*</exclude>
+                  </excludes>  -->
+                </relocation>
+              </relocations>
+                <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                <!--  <mainClass>org.plinkcloud.mapreduce.MRVCF2TPED</mainClass>  -->
+                </transformer>
+              </transformers>
+              <minimizeJar>true</minimizeJar>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>		
 			
      <!--  <plugin>
         <groupId>org.codehaus.mojo</groupId>

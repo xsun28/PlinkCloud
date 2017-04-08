@@ -12,7 +12,13 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>plinkcloud-priorityqueue</name>
   <url>http://maven.apache.org</url>
-
+<dependencies>
+<dependency>
+    <groupId>org.apache.commons</groupId>
+    <artifactId>commons-compress</artifactId>
+    <version>1.5</version>
+</dependency>
+</dependencies>
   <build>
     <finalName>plinkcloud-priorityqueue</finalName>
   <plugins>  	
@@ -23,7 +29,7 @@
 			<configuration>
   <archive>
     <manifest>
-	<mainClass>org.plinkcloud.priorityqueue.PriorityQueueJoin</mainClass>
+	<mainClass>org.plinkcloud.priorityqueue.MultiwayMergeVCF2TPED</mainClass>
     </manifest>
   </archive>
 </configuration>
@@ -42,9 +48,10 @@
           <descriptorRefs>
             <descriptorRef>jar-with-dependencies</descriptorRef>
           </descriptorRefs>
+           <appendAssemblyId>false</appendAssemblyId>
           <archive>
     <manifest>
-	<mainClass>org.plinkcloud.priorityqueue.PriorityQueueJoin</mainClass>
+	<mainClass>org.plinkcloud.priorityqueue.MultiwayMergeVCF2TPED</mainClass>
     </manifest>
   </archive>
         </configuration>

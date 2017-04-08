@@ -21,7 +21,8 @@ public class TextParser {
 		int chrm;
 		if(chr.equalsIgnoreCase("X")) chrm = 23;
 		else if (chr.equalsIgnoreCase("Y")) chrm = 24;
-		else if (chr.equalsIgnoreCase("M")) chrm = 25;
+		else if (chr.equalsIgnoreCase("XY")) chrm = 25;
+		else if (chr.equalsIgnoreCase("M")) chrm = 26;
 		else chrm = Integer.parseInt(chr);
 		return chrm;
 	}
