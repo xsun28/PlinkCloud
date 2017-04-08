@@ -1,0 +1,44 @@
+[
+  {
+    "Classification": "core-site",
+    "Properties": {
+      "io.file.buffer.size": "131072"
+    }
+  },
+   {
+    "Classification": "yarn-site",
+    "Properties": {
+    	"yarn.nodemanager.resource.memory-mb": "13312",
+    	"yarn.nodemanager.resource.cpu-vcores":"7"  
+    }
+  },
+  {
+    "Classification": "mapred-site",
+    "Properties": {
+    	"mapreduce.task.io.sort.mb": "600",
+    	"mapreduce.reduce.input.buffer.percent":"1",
+    	"mapreduce.reduce.merge.inmem.threshold":"0",
+    	"mapreduce.reduce.shuffle.input.buffer.percent":"0.7"    
+    }
+  },
+  {
+    "Classification": "hbase-site",
+    "Properties": {
+    	 "hbase.regionserver.handler.count": "30",
+    	 "hbase.hregion.max.filesize": "1073741824"    
+    }
+  },
+  {
+        "Classification": "hbase-env", 
+        "Configurations": [
+            {
+                "Classification": "export", 
+                "Configurations": [], 
+                "Properties": {
+                    "HBASE_CONF_DIR": "/etc/hbase/conf"
+                }
+            }
+        ], 
+        "Properties": {}
+    }
+]
