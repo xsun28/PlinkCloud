@@ -16,7 +16,7 @@
     "Classification": "mapred-site",
     "Properties": {
     	"mapreduce.task.io.sort.mb": "600",
-    	"mapreduce.reduce.input.buffer.percent":"1",
+    	"mapreduce.reduce.input.buffer.percent":"0.9",
     	"mapreduce.reduce.merge.inmem.threshold":"0",
     	"mapreduce.reduce.shuffle.input.buffer.percent":"0.7"    
     }
@@ -35,6 +35,7 @@
                 "Classification": "export", 
                 "Configurations": [], 
                 "Properties": {
+                	"HBASE_REGIONSERVER_OPTS": "8192",
                     "HBASE_CONF_DIR": "/etc/hbase/conf"
                 }
             }

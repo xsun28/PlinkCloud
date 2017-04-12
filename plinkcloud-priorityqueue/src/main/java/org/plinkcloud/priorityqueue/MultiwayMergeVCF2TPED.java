@@ -53,9 +53,9 @@ private int startChr;
 private int endChr;
 private enum Quality {
 	NULL,Q10,Q20,PASS
-};		
+};
+BufferedReader[] readers;
 private Quality qual_filter;
-private Semaphore write_sem;
 private boolean sorted;
 //private String key;
 class Pos implements Comparable<Pos>{
@@ -64,27 +64,21 @@ class Pos implements Comparable<Pos>{
 	private String genotype;
 	private int seq;
 	private String SNP_ID;
-	private Semaphore semaphore;
 	private int file_no;
 	private String chr_str;
 	
-	
-	public Pos(int chr, int seq, Semaphore sem){
-		this.semaphore = sem;
-		this.chr = chr;
+	public Pos(String chr_str, int seq){	
 		this.seq = seq;
-		this.chr_str = chrToStr(chr);
+		this.chr_str = chr_str;
+		this.chr = chrToNum(chr_str);		
 	}
 	
 	@Override
 	public int compareTo(Pos second){
 //		if(second.chr_str == null) return -1;
-		if(this.chr != second.chr){
-			if(sorted) return this.chr-second.chr;				
-			else return this.chr_str.compareTo(second.chr_str);
-		}		
-		return this.seq-second.seq;
-		
+		if(Objects.equals(this.chr_str,second.chr_str))
+			return this.seq-second.seq;
+		else return this.chr_str.compareTo(second.chr_str);					
 	}
 	
 	@Override 
@@ -93,13 +87,11 @@ class Pos implements Comparable<Pos>{
 		if(null==second) return false;
 		if(!(second instanceof Pos)) return false;
 		Pos second_pos = (Pos)second;
-		return Objects.equals(chr,second_pos.chr) && seq==second_pos.seq;		
+		return Objects.equals(chr_str,second_pos.chr_str) && seq==second_pos.seq;		
 	}
 	
 
-	public void Semaphore_Unlock(){
-			semaphore.release();
-	}
+	
 	public void setFileNo(int num){
 		file_no = num;
 	}
@@ -141,171 +133,122 @@ class Pos implements Comparable<Pos>{
 	}
 }// end of Pos class
 
-	public String chrToStr(int num){
-		String chr;
-		switch(num){
-		case 23: chr = "X"; break;
-		case 24: chr = "Y"; break;
-		case 25: chr = "XY"; break;
-		case 26: chr = "M"; break;
-//		case Integer.MAX_VALUE: chr = null; break;
-		default: chr = String.valueOf(num);
-		}
-		return chr;
+public String chrToStr(int num){
+	String chr;
+	switch(num){
+	case 23: chr = "X"; break;
+	case 24: chr = "Y"; break;
+	case 25: chr = "XY"; break;
+	case 26: chr = "M"; break;
+	default: chr = String.valueOf(num);
+	}
+	return chr;
+}
+
+
+	
+private boolean passQual(String line){
+	Quality qual = getQuality(line);
+	return !(null == qual || qual.compareTo(qual_filter) < 0);
+}
+	
+private boolean chrInRange(String line){
+	String[] fields = line.split("\\s");
+	String chr =  parseChr(fields[0].trim()) ;	
+	if(null == chr) return false; // in case some file has blank space at the end of the file
+	int chrnum = chrToNum(chr);
+	if(chrnum > endChr || chrnum < startChr) return false;
+	return true;
+}
+	
+private void readPos(int num) throws IOException, Exception{
+	BufferedReader reader = readers[num];
+	String line = reader.readLine();
+	if(null == line){
+		file_finished--;
+		reader.close();
+		return;
 	}
 
-class VCFReader implements Callable<Integer> {
-	BufferedReader reader;
-	private Semaphore semaphore;
-	private int num;
-	public VCFReader(String filename, int num, boolean sorted){
-		String filePath = inputFileContext+filename;
-		this.num = num;
-		semaphore = new Semaphore(0);
-		try{
-			
-			if(sorted){
-				CompressorInputStream cis =  new CompressorStreamFactory().createCompressorInputStream(
-						new BufferedInputStream (new FileInputStream(filePath)));
-				reader = new BufferedReader(new InputStreamReader(cis));
-			}
-			else{
-				reader =  new BufferedReader(new FileReader(filePath));  //VCF is not compressed
-			}
-		}
-		catch(CompressorException ce){
-			logger.error("Decompression errors");
-			ce.printStackTrace();
-		}
-		catch(IOException ioe){
-			logger.error("Read VCF errors");
-			ioe.printStackTrace();
-		}
-	}
-	
-	@Override
-	public Integer call() throws IOException{
-		try{
-		extractPosToSet();
-		file_finished--;
-		logger.debug("Thread {} finished, queue size is {}, remaining task number is {}",num,pqueue.size(),file_finished);
-		}catch(Exception e){
-			logger.debug("IOE error reading VCF files");
-			e.printStackTrace();
-			return READ_FAILURE;
-		}finally{
+	while((!passQual(line)) || (!chrInRange(line))){			
+		line = reader.readLine();
+		if(null == line){
+			file_finished--;
 			reader.close();
+			return;
 		}
-		return READ_SUCCESS;
-	} 
-	
-	private void extractPosToSet() throws IOException, Exception{
-		String line;
-		while ((line = reader.readLine()) != null){
-//			if(!line.toLowerCase().startsWith("#chrom")&&header)
-//				continue;
-//			else if (line.toLowerCase().startsWith("#chrom")){
-//				header=false;
-//				continue;
-//			}
-			Quality qual = getQuality(line);
-			if(null == qual || qual.compareTo(qual_filter) < 0){
-				continue;
-			}
-			else{
-				String[] fields = line.split("\\s");
-				String chr =  parseChr(fields[0].trim()) ;		
-				if(null==chr) {
-					logger.error("in reader {}, the chr is null, input is {}",num,line);
-					continue;
-					}// in case some file has blank space at the end of the file
-				int chrnum = chrToNum(chr);
-				if(chrnum > endChr || chrnum < startChr) continue;
-				int seq = Integer.parseInt(fields[1].trim());
-				String ref = fields[3].trim();
-				String snp_id = fields[2].trim();
-				String geno_type = parseGenotype(line);
-				Pos pos = new Pos(chrnum, seq,semaphore);
-				pos.setFileNo(num);
-				pos.seRef(ref);
-				pos.setSNP_ID(snp_id);
-				pos.setGeno_Type(geno_type);
-				pqueue.put(pos);
-				write_sem.release();
-				try{
-					semaphore.acquire();
-					}catch(InterruptedException ie){
-						logger.error("Semaphore lock error");
-						ie.printStackTrace();
-					}
-//				if(logger.isDebugEnabled()){
-//					logger.debug("the first chr {}, the first pos {}",fields[0],fields[1]);
-//				}					
-			}		
-		}
-//		pqueue.put(new Pos(Integer.MAX_VALUE,Integer.MAX_VALUE,semaphore));
-		write_sem.release();
-	}
-	
-	private String parseChr(String input){
+	}	
+	String[] fields = line.split("\\s");
+	String chr =  parseChr(fields[0].trim()) ;		
+	int seq = Integer.parseInt(fields[1].trim());
+	String ref = fields[3].trim();
+	String snp_id = fields[2].trim();
+	String geno_type = parseGenotype(line);
+	Pos pos = new Pos(chr, seq);
+	pos.setFileNo(num);
+	pos.seRef(ref);
+	pos.setSNP_ID(snp_id);
+	pos.setGeno_Type(geno_type);
+	pqueue.put(pos);
+}
+
+private String parseChr(String input){
 		
-		Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
-		Matcher matcher = pattern.matcher(input);
-		if(matcher.find()){
-			int start = matcher.start();
-			int end = matcher.end();
-			String chr = input.substring(start,end);
-			return chr;
-		}
-		else{
-			logger.error("chromosome {} can't be parsed",input);
-			return null;
-			//throw new Exception("Chromosome can't be parsed");
-			}		
+	Pattern  pattern = Pattern.compile("[xym\\d]{1,2}",Pattern.CASE_INSENSITIVE);
+	Matcher matcher = pattern.matcher(input);
+	if(matcher.find()){
+		int start = matcher.start();
+		int end = matcher.end();
+		String chr = input.substring(start,end);
+		return chr;
 	}
+	else{
+		logger.error("chromosome {} can't be parsed",input);
+		return null;
+		//throw new Exception("Chromosome can't be parsed");
+		}		
+}
 	
-	private String parseGenotype(String line){
-		StringBuilder genotype = new StringBuilder();
-		String numbered_genotype = null;//1/0, 1/1...
-		Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
-		String [] fields = line.split("\\s");
-		String genotype_field = fields[9].trim();
-		String [] alts = fields[4].trim().split(",");
-		String ref = fields[3].trim();
-		Matcher matcher = genotypePattern.matcher(genotype_field);
-		if(matcher.find())
-			numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
-		String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
-		for (int i=0;i<genotype_numbers.length;i++){
-			int number = Integer.parseInt(genotype_numbers[i].trim());
-			if(number==0)
-				genotype.append(ref).append(" ");
-			else
-				genotype.append(alts[number-1]).append(" ");	
-		}
-		return genotype.toString().trim();
+private String parseGenotype(String line){
+	StringBuilder genotype = new StringBuilder();
+	String numbered_genotype = null;//1/0, 1/1...
+	Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
+	String [] fields = line.split("\\s");
+	String genotype_field = fields[9].trim();
+	String [] alts = fields[4].trim().split(",");
+	String ref = fields[3].trim();
+	Matcher matcher = genotypePattern.matcher(genotype_field);
+	if(matcher.find())
+		numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
+	String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
+	for (int i=0;i<genotype_numbers.length;i++){
+		int number = Integer.parseInt(genotype_numbers[i].trim());
+		if(number==0)
+			genotype.append(ref).append(" ");
+		else
+			genotype.append(alts[number-1]).append(" ");	
 	}
+	return genotype.toString().trim();
+}
 	
-	private Quality getQuality(String line){
-		if(null == line) return null;
-		if(line.startsWith("#")) return null; // header
-		if(line.contains("PASS")) return Quality.PASS;
-		else if(line.contains("q20")) return Quality.Q10;
-		else if(line.contains("q10")) return Quality.Q20;
-		else return null;
-		
-	}
+private Quality getQuality(String line){
+	if(null == line) return null;
+	if(line.startsWith("#")) return null; // header
+	if(line.contains("PASS")) return Quality.PASS;
+	else if(line.contains("q20")) return Quality.Q20;
+	else if(line.contains("q10")) return Quality.Q10;
+	else return null;
 	
-}// end of VCFReader class
+}
+	
 
 public MultiwayMergeVCF2TPED(String input, String output, String start_chr, String end_chr, String quality, boolean sorted){
 	File dir=new File(input);
 	String[] fileNames=dir.list();
 	file_no = fileNames.length;
-	write_sem = new Semaphore(0);
+	readers = new BufferedReader[file_no];
 	file_finished = file_no;
 	pqueue = new PriorityBlockingQueue<Pos>(file_no);
-	threadPool = Executors.newCachedThreadPool();
 	inputFileContext = dir.getAbsolutePath()+"/";
 	this.output = output;
 	this.sorted = sorted;
@@ -324,7 +267,8 @@ public MultiwayMergeVCF2TPED(String input, String output, String start_chr, Stri
 	try{
 		if(!sorted)
 			inputFileNameList = (ArrayList<String>) sortFiles(inputFileNameList);
-		readVCFs(inputFileNameList, sorted);
+		createReaders(inputFileNameList, sorted);
+		
 	}catch(Exception e){
 		logger.error("Reader interrupting error");
 		e.printStackTrace();
@@ -393,18 +337,32 @@ public int chrToNum(String chr){
 
 
 
-private void readVCFs(ArrayList<String> nameList, boolean sorted) throws InterruptedException{
+private void createReaders(ArrayList<String> nameList, boolean sorted) {
 	int i = 0;
-	for(String fileName:nameList)
-		threadPool.submit(new VCFReader(fileName,i++,sorted));
+	try{
+	for(String fileName:nameList){
+		CompressorInputStream cis =  new CompressorStreamFactory().createCompressorInputStream(
+				new BufferedInputStream (new FileInputStream(inputFileContext+fileName)));
+		readers[i] = new BufferedReader(new InputStreamReader(cis));
+		i++;
+	}
+	}catch(IOException ie){
+		logger.error("IOException when creating reader {}", i);
+		ie.printStackTrace();
+		
+	}
+	catch(CompressorException ce){
+		logger.error("CompressorException when creating reader {}", i);
+		ce.printStackTrace();
+	}
 }
 
 private StringBuilder constructResult(StringBuilder sb, String[] genotypes, String ref){
 	for(String genotype: genotypes){
 		if(null == genotype){
-			 sb.append("\t").append(ref+" "+ref);
+			 sb.append(ref+" "+ref+" ");
 		}else{
-			sb.append("\t").append(genotype);
+			sb.append(genotype).append(" ");
 		}
 	}
 	return sb;
@@ -420,34 +378,39 @@ public void TPedMerge()  {
 //	try(CompressorOutputStream cos =  new CompressorStreamFactory().createCompressorOutputStream(CompressorStreamFactory.BZIP2,new BufferedOutputStream (new FileOutputStream(output)));
 //		PrintWriter pw = new PrintWriter(cos);	
 //			){
-
-		while(file_finished>0 || prevPos==null){
+		for(int i = 0;i < file_no; i++)
+			readPos(i);
+		
+		
+		while(file_finished>0){
 //			if(pqueue.size() == file_no){
-			if(!pqueue.isEmpty()){
-				write_sem.acquire(file_no);
-				currentPos = pqueue.take();
-				write_sem.release(file_no-1);
-				if(null != currentPos){
-					currentPos.Semaphore_Unlock();
-					if(!currentPos.equals(prevPos)){
-			
-						if(null!=outputLine){
-							outputLine = constructResult(outputLine,genotypes,ref);
-							pw.println(outputLine.toString());
-						}
-						outputLine = new StringBuilder();
-						outputLine.append(currentPos.getChr()).append("\t").append(currentPos.getSNP_ID())
-						.append("\t").append("0\t").append(currentPos.getSeq());			
-						genotypes = new String[file_no];
-						ref = currentPos.getRef();
-						genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
-					}else{
-						genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
-					}
-					prevPos = currentPos;
+			currentPos = pqueue.take();
+			int num = currentPos.getFileNo();
+			readPos(num);
+			if(!currentPos.equals(prevPos)){
+				if(prevPos != null){
+//					if(currentPos.chr == 19 && currentPos.getSeq() == 59118099){
+//						System.err.println("current chr "+ currentPos.chr +"\t pos "+currentPos.getSeq());
+//						System.err.println("prev chr "+ prevPos.chr +"\t pos "+ prevPos.getSeq());
+//						System.err.println("equals: "+currentPos.equals(prevPos));
+//					}
+					StringBuilder result = constructResult(outputLine,genotypes,ref);
+					pw.println(result.toString().trim());
 				}
+				outputLine = new StringBuilder();
+				outputLine.append(currentPos.getChr()).append("\t").append(currentPos.getSNP_ID())
+					.append("\t0\t").append(currentPos.getSeq()+"\t");			
+				genotypes = new String[file_no];
+				ref = currentPos.getRef();
+				genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
+			}else{
+				genotypes[currentPos.getFileNo()] = currentPos.getGeno_Type();
 			}
+			prevPos = currentPos;
+			
 		}
+		StringBuilder result = constructResult(outputLine,genotypes,ref);
+		pw.println(result.toString().trim());
 	}catch(IOException ioe){
 		logger.error("IOException of TPEDMerger");
 		ioe.printStackTrace();
@@ -457,9 +420,10 @@ public void TPedMerge()  {
 //	}catch(CompressorException ce){
 //		logger.error("compressor exception of TPEDMerger");
 //		ce.printStackTrace();
+	}catch(Exception e){
+		logger.error("Other Exception of TPEDMerger");
+		e.printStackTrace();
 	}
-	
-
 }//end of TPedMerge
 
 public static void main(String[] args) throws Exception {  //java -jar plinkcloud-priorityqueue.jar VCF/ Result.tped 1-26 PASS true

@@ -237,7 +237,10 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 				}
 			int step = (temp.size()+1)/region_num;
 			for(int i = 0; i<temp.size(); i++){
-				if((i+1)%step == 0) boundaries.add(temp.get(i));
+				if((i+1)%step == 0) {
+					System.out.println("Selected boundary: "+temp.get(i));
+					boundaries.add(temp.get(i));
+				}
 			}
 		}else{
 			TextParser parser = new TextParser();
@@ -294,7 +297,7 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 		conf.set("endchr", end_chr);
 		conf.setBoolean("ordered", ordered);
 		String[] row_range = getRowRange(start_chr,end_chr);
-		int region_num = Integer.parseInt(args[3].trim())/3;  //keep each region to hold approximately 3 input file's size data. The region size should around 1G
+		int region_num = Integer.parseInt(args[3].trim())/2;  //keep each region to hold approximately 3 input file's size data. The region size should around 1G
 		region_num = region_num > 1? region_num : 2;   //if region num 
 		conf.setBoolean("mapreduce.map.speculative", false);
 		conf.setBoolean("mapreduce.reduce.speculative", false);  //turn off the speculative execution
