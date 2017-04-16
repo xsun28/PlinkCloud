@@ -372,7 +372,7 @@ public class VCF2TPEDSpark {
 
 	}// end of CombineMap
 	
-	public static void main(String[] args) {  //spark-submit --class org.plinkcloud.spark.VCF2TPEDSpark --master yarn --deploy-mode cluster --executor-cores 1 --executor-memory 1g --conf spark.network.timeout=10000000 --conf spark.yarn.executor.memoryOverhead=1024 --conf spark.shuffle.memoryFraction=0.5 plinkcloud-spark.jar VoTECloud/input/ Spark/output 3 1-3 PASS
+	public static void main(String[] args) {  //spark-submit --class org.plinkcloud.spark.VCF2TPEDSpark --master yarn --deploy-mode cluster --executor-cores 1 --executor-memory 1g --conf spark.network.timeout=10000000 --conf spark.yarn.executor.memoryOverhead=700 --conf spark.shuffle.memoryFraction=0.5 plinkcloud-spark.jar plinkcloud/input/ Spark/output $1 1-26 PASS
 		long start_time = System.currentTimeMillis();
 		String input_path = args[0];
 		String output_path = args[1];
