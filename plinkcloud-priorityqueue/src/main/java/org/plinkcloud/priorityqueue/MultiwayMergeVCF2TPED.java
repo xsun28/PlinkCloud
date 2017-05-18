@@ -29,6 +29,7 @@ import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.cli.CommandLine;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
@@ -46,7 +47,6 @@ private static final int SORT_FAILURE = -2;
 private PriorityBlockingQueue<Pos> pqueue;
 private String inputFileContext;
 private String output;
-private ExecutorService threadPool;
 private int file_no;
 private int file_finished; 
 private int startChr;
@@ -57,6 +57,7 @@ private enum Quality {
 BufferedReader[] readers;
 private Quality qual_filter;
 private boolean sorted;
+private int gcolumn;
 //private String key;
 class Pos implements Comparable<Pos>{
 	private int chr;
@@ -214,7 +215,7 @@ private String parseGenotype(String line){
 	String numbered_genotype = null;//1/0, 1/1...
 	Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
 	String [] fields = line.split("\\s");
-	String genotype_field = fields[9].trim();
+	String genotype_field = fields[gcolumn].trim();
 	String [] alts = fields[4].trim().split(",");
 	String ref = fields[3].trim();
 	Matcher matcher = genotypePattern.matcher(genotype_field);
@@ -242,7 +243,7 @@ private Quality getQuality(String line){
 }
 	
 
-public MultiwayMergeVCF2TPED(String input, String output, String start_chr, String end_chr, String quality, boolean sorted){
+public MultiwayMergeVCF2TPED(String input, String output, String start_chr, String end_chr, String quality, boolean sorted, int genotypeColumn){
 	File dir=new File(input);
 	String[] fileNames=dir.list();
 	file_no = fileNames.length;
@@ -252,6 +253,7 @@ public MultiwayMergeVCF2TPED(String input, String output, String start_chr, Stri
 	inputFileContext = dir.getAbsolutePath()+"/";
 	this.output = output;
 	this.sorted = sorted;
+	this.gcolumn = genotypeColumn;
 	startChr = chrToNum(start_chr);
 	endChr = chrToNum(end_chr);
 	this.qual_filter = Enum.valueOf(Quality.class, quality.trim().toUpperCase()); 
@@ -426,16 +428,20 @@ public void TPedMerge()  {
 	}
 }//end of TPedMerge
 
-public static void main(String[] args) throws Exception {  //java -jar plinkcloud-priorityqueue.jar VCF/ Result.tped 1-26 PASS true
+public static void main(String[] args) throws Exception {  //java -jar plinkcloud-priorityqueue.jar -i VCF/ -o Result.tped -c 1-26 -q PASS -s true -g 10
 	long startTime = System.currentTimeMillis();
-	String input = args[0];
-	String output = args[1];
-	String chr_range = args[2].trim();
+	CommandLine cmd = commandParser.parseCommands(args);
+	String input = cmd.getOptionValue("i");
+	String output = cmd.getOptionValue("o");;
+	String chr_range = cmd.getOptionValue("c");
 	String start_chr = chr_range.substring(0,chr_range.indexOf("-"));
 	String end_chr = chr_range.substring(chr_range.indexOf("-")+1);
-	String quality = args[3];
-	boolean sorted = Boolean.parseBoolean(args[4]);
-	MultiwayMergeVCF2TPED pqj=new MultiwayMergeVCF2TPED(input,output,start_chr,end_chr, quality, sorted);
+	String quality = cmd.getOptionValue("q");
+	boolean sorted = true;
+	if(cmd.hasOption("s"))
+		sorted = Boolean.parseBoolean(cmd.getOptionValue("s"));
+	int genotypeColumn = Integer.parseInt(cmd.getOptionValue("g"));
+	MultiwayMergeVCF2TPED pqj=new MultiwayMergeVCF2TPED(input,output,start_chr,end_chr, quality, sorted,genotypeColumn);
 	pqj.TPedMerge();
 	System.out.println("Join Execution Time: "+(System.currentTimeMillis()-startTime)/1000+" seconds");
 }//end of main

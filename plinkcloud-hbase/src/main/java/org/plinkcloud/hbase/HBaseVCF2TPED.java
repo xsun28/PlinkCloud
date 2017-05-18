@@ -62,7 +62,7 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 		private long kept = 1;
 		private boolean ordered;
 		private Random random;
-		
+		private int col = 9;
 		@Override
 		protected void setup(Context context){
 			Configuration conf = context.getConfiguration();
@@ -74,7 +74,7 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 		
 		@Override 
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
-			TextParser parser = new TextParser(value.toString());	
+			TextParser parser = new TextParser(value.toString(),col);	
 			Quality qual = parser.getQuality();
 			if(null != qual && qual.compareTo(qual_filter) >= 0){
 				records++;
@@ -122,7 +122,7 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 		private byte[] ref_qualifier = null;
 		private byte[] rs_qualifier = null;
 		private Quality qual_filter;
-		
+		private int col = 9;
 		@Override
 		protected void setup(Context context) throws IOException, InterruptedException{ 		//called once at the beginning of a mapper with a single input split 
 			
@@ -139,7 +139,7 @@ public class HBaseVCF2TPED extends Configured implements Tool{
 	
 		@Override
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
-			TextParser parser = new TextParser(value.toString());
+			TextParser parser = new TextParser(value.toString(),col);
 			Quality qual = parser.getQuality();
 			if(null != qual && qual.compareTo(qual_filter) >= 0){
 				byte [] genotype = Bytes.toBytes(parser.getGenotype());     	// value is the genotype

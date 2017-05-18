@@ -58,13 +58,13 @@ public class TextParser {
 		return row_key;
 	}
 	
-	private String parseGenotype(String line){
+	private String parseGenotype(String line, int genotype_col){
 		
 		StringBuilder genotype = new StringBuilder();
 		String numbered_genotype = null;//1/0, 1/1...
 		Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
 		String [] fields = line.split("\\s");
-		String genotype_field = fields[9].trim();
+		String genotype_field = fields[genotype_col].trim();
 		String [] alts = fields[4].trim().split(",");
 		String ref = fields[3].trim();
 		Matcher matcher = genotypePattern.matcher(genotype_field);
@@ -85,13 +85,13 @@ public class TextParser {
 		
 	}
 	
-	public TextParser(String line){
+	public TextParser(String line, int genotype_col){
 		quality = getQuality(line);
 		if(null != quality){
 		String[] fields = line.split("\\s+");
 		chrm = fields[0].substring(fields[0].indexOf("r")+1).trim();
 		chr_num = parseChrnum(chrm);
-		genotype = parseGenotype(line);
+		genotype = parseGenotype(line, genotype_col);
 		pos = fields[1].trim();
 		rs =  fields[2].trim();
 		ref = fields[3].trim();

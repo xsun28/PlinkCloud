@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -67,6 +68,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 		private Random random;
 		private boolean ordered;
 		private int startchr, endchr;
+		private int genotype_col;
 		@Override
 		public void setup(Context context) throws IOException, InterruptedException{ 		//called once at the beginning of a mapper with a single input split 
 			
@@ -77,6 +79,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 			ordered = conf.getBoolean("ordered", true);
 			startchr = conf.getInt("startchr", 1);
 			endchr = conf.getInt("endchr", 26);
+			genotype_col = conf.getInt("genotype_col",9);
 			FileSplit fileSplit = (FileSplit)context.getInputSplit();
 			String fullname=fileSplit.getPath().getName();									//get the name of the file where the input split is from
 			filename=fullname.substring(0, fullname.indexOf('.')); 							//the individual number			
@@ -99,7 +102,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 			String numbered_genotype = null;//1/0, 1/1...
 			Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
 			String [] fields = line.split("\\s");
-			String genotype_field = fields[9].trim();
+			String genotype_field = fields[genotype_col].trim();
 			String [] alts = fields[4].trim().split(",");
 			String ref = fields[3].trim();
 			Matcher matcher = genotypePattern.matcher(genotype_field);
@@ -369,21 +372,29 @@ public class MRVCF2TPED extends Configured implements Tool {
 	public int run(String [] args) throws Exception {
 		
 		int code = 0;
-		Path inputPath = new Path(args[0]); // 		VoTECloud/input
-		Path outputPath = new Path(args[1]); // 	VoTECloud/output
-		int indno = Integer.parseInt(args[2].trim());
-		double sampleRate = Double.parseDouble(args[3]); //0.0001
-		String chrmrange = args[4];
+		Configuration conf = getConf();
+		CommandLine cmd = commandParser.parseCommands(args, conf);
+		String input = cmd.getOptionValue("i");			//plinkcloud/input/
+		String output = cmd.getOptionValue("o");		//mapreduce/	
+		Path inputPath = new Path(input); // 		VoTECloud/input
+		Path outputPath = new Path(output); // 	VoTECloud/output
+		int indno = Integer.parseInt(cmd.getOptionValue("n"));
+		double sampleRate = 0.0001;
+		if(cmd.hasOption("r"))
+			sampleRate = Double.parseDouble(cmd.getOptionValue("r")); 
+		String chrmrange = cmd.getOptionValue("c");
+		String quality = cmd.getOptionValue("q");
+		boolean ordered = true;
+		if(cmd.hasOption("s"))
+			ordered = Boolean.parseBoolean(cmd.getOptionValue("s"));
+		int genotypeColumn = Integer.parseInt(cmd.getOptionValue("g"));
 		//boolean compression = Boolean.parseBoolean(args[5]);
-		boolean ordered = Boolean.parseBoolean(args[5]);
-		String quality = args[6].trim();
 		int index = chrmrange.indexOf("-");
 		String firstchrm = chrmrange.substring(0, index).trim();
 		String lastchrm = chrmrange.substring(index+1).trim();		
 		int first = chrToNum(firstchrm);
 		int last = chrToNum(lastchrm);
 		int chromsno = last-first+1;
-		Configuration conf = getConf();
 		String defaultName = conf.get("fs.default.name");
 		System.out.println("default "+defaultName);
 		String []chroms = new String[chromsno];
@@ -395,20 +406,24 @@ public class MRVCF2TPED extends Configured implements Tool {
 			else if(j==25) chroms[i] = "chrXY";
 			else if(j==26) chroms[i] = "chrM";
 			else chroms[i] = "chr"+j;
-			chrmFiles[i] = defaultName+args[1]+"/"+chroms[i];
+			chrmFiles[i] = defaultName+output+"/"+chroms[i];
 			chrmResults[i] = chrmFiles[i]+"_result";
 		} 
 		long [] chrSampleNum = new long[chromsno];  //sampled number of records for each chr
 		long [] chrNum = new long[chromsno];   //number of records for each chr
 		FileSystem fs = FileSystem.get(URI.create(chrmFiles[0]),conf);
-		boolean exist = fs.exists(new Path(chrmFiles[0])); //test if chromosomes have been already binned
-		conf.set("fileno", args[2]);
-		conf.set("outputpath",defaultName+args[1]);
+		boolean exist = false;
+		if(cmd.hasOption("e"))
+			exist = true;
+//		boolean exist = fs.exists(new Path(chrmFiles[0])); //test if chromosomes have been already binned
+		conf.set("fileno", String.valueOf(indno));
+		conf.set("outputpath",defaultName+output);
 		conf.set("samplerate", ""+sampleRate);
 		conf.setBoolean("ordered", ordered);
 		conf.set("quality", quality);
 		conf.setInt("startchr", first);
 		conf.setInt("endchr", last);
+		conf.setInt("genotype_col", genotypeColumn);
 		conf.setDouble("mapreduce.reduce.input.buffer.percent", 1);   //because the reduce task is light, so we can reserve memory for input buffer after sort/merge phase before reduce phase to minimize spilled records.
 		conf.setDouble("mapreduce.reduce.merge.inmem.threshold", 0);
 		if(!exist){
@@ -425,7 +440,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 			chrJob.setReducerClass(PartitionReducer.class );
 			chrJob.setOutputKeyClass(LongWritable.class);
 			chrJob.setOutputValueClass(NullWritable.class);
-			chrJob.setNumReduceTasks(26);
+			chrJob.setNumReduceTasks(chromsno);
 			chrJob.getConfiguration().setBoolean("mapred.compress.map.output", true);
 			chrJob.getConfiguration().setClass("mapred.map.output.compression.codec", Lz4Codec.class, CompressionCodec.class);
 			MultipleOutputs.addNamedOutput(chrJob, "ChrBinningMos",SequenceFileOutputFormat.class, LongWritable.class, Text.class);//multiple outputs for binning chromosomes				
@@ -467,7 +482,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 					
 					if(exited[i]) continue;
 					if(chrNum[i] == 0) continue; //no records for chr i
-					jobs[i] = new ControlledJob(getSecondJobConf(this, conf,first+i,new Path(chrmFiles[i]),new Path(chrmResults[i]),defaultName+args[1], sampleRate, indno, chrSampleNum[i]));
+					jobs[i] = new ControlledJob(getSecondJobConf(this, conf,first+i,new Path(chrmFiles[i]),new Path(chrmResults[i]),defaultName+output, sampleRate, indno, chrSampleNum[i]));
 					jc.addJob(jobs[i]);
 				}
 				JobRunner runner = new JobRunner(jc);
@@ -486,7 +501,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 
 	}// end of run
 
-	public static void main(String[] args) throws Exception{  //hadoop jar plinkcloud-mapreduce.jar org.plinkcloud.mapreduce.MRVCF2TPED -D mapreduce.task.io.sort.mb=600 -D mapreduce.reduce.merge.inmem.threshold=0 -D mapreduce.reduce.input.buffer.percent=1 /user/hadoop/plinkcloud/input/ /user/hadoop/mapreduce/output/ $1 0.0001 1-26 false PASS  //////-libjars lib/..jar,..jar
+	public static void main(String[] args) throws Exception{  //hadoop jar plinkcloud-mapreduce.jar org.plinkcloud.mapreduce.MRVCF2TPED -D mapreduce.task.io.sort.mb=600 -D mapreduce.reduce.merge.inmem.threshold=0 -D mapreduce.reduce.input.buffer.percent=1 -i /user/hadoop/plinkcloud/input/ -o /user/hadoop/mapreduce/output/ -n $1 -r 0.0001 -c 1-26 -s false -q PASS -g 10 -e //////-libjars lib/..jar,..jar
 		//long start_time = System.currentTimeMillis();
 		int code=ToolRunner.run(new MRVCF2TPED(), args);
 		//long end_time = System.currentTimeMillis();

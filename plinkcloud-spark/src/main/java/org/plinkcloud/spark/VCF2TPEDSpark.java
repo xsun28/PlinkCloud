@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -231,11 +233,13 @@ public class VCF2TPEDSpark {
 		
 		Quality quality;
 		private int start_chr, end_chr;
+		private int genotype_col;
 		
-		public ConvertMap(String start, String end, String qual){
+		public ConvertMap(String start, String end, String qual, int genotype_col){
 			start_chr = parseChrnum(start);
 			end_chr = parseChrnum(end);
 			quality = getQuality(qual);
+			this.genotype_col = genotype_col;
 		}
 		
 		private Quality getQuality(String line){
@@ -300,7 +304,7 @@ public class VCF2TPEDSpark {
 			String numbered_genotype = null;//1/0, 1/1...
 			Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
 			String [] fields = line.split("\\s");
-			String genotype_field = fields[9].trim();
+			String genotype_field = fields[genotype_col].trim();
 			String [] alts = fields[4].trim().split(",");
 			String ref = fields[3].trim();
 			Matcher matcher = genotypePattern.matcher(genotype_field);
@@ -372,18 +376,19 @@ public class VCF2TPEDSpark {
 
 	}// end of CombineMap
 	
-	public static void main(String[] args) {  //spark-submit --class org.plinkcloud.spark.VCF2TPEDSpark --master yarn --deploy-mode cluster --executor-cores 1 --executor-memory 1g --conf spark.network.timeout=10000000 --conf spark.yarn.executor.memoryOverhead=700 --conf spark.shuffle.memoryFraction=0.5 plinkcloud-spark.jar plinkcloud/input/ Spark/output $1 1-26 PASS
-		long start_time = System.currentTimeMillis();
-		String input_path = args[0];
-		String output_path = args[1];
-		int ind_num = Integer.parseInt(args[2]);
-		String chr_range = args[3].trim();
+	public static void main(String[] args) throws Exception {  //spark-submit --class org.plinkcloud.spark.VCF2TPEDSpark --master yarn --deploy-mode cluster --executor-cores 1 --executor-memory 1g --conf spark.network.timeout=10000000 --conf spark.yarn.executor.memoryOverhead=700 --conf spark.shuffle.memoryFraction=0.5 plinkcloud-spark.jar -i plinkcloud/input/ -o Spark/output -n $1 -c 1-26 -q PASS -g 9
+		CommandLine cmd = commandParser.parseCommands(args);
+		String input_path = cmd.getOptionValue("i");
+		String output_path = cmd.getOptionValue("o");
+		int ind_num = Integer.parseInt(cmd.getOptionValue("n"));
+		String chr_range = cmd.getOptionValue("c");
 		String start_chr = chr_range.substring(0,chr_range.indexOf("-"));
 		String end_chr = chr_range.substring(chr_range.indexOf("-")+1);
 //		double sampleRate = Double.parseDouble(args[4]);  //0.0005
 //		String quality = args[5];
 //		SparkConf conf = new SparkConf().setMaster("yarn-client").setAppName("plinkcloud-spark");
-		String quality = args[4];
+		String quality = cmd.getOptionValue("q");
+		int genotype_col = Integer.parseInt(cmd.getOptionValue("g"));
 		SparkConf conf = new SparkConf().setAppName("plinkcloud-spark");  //set master model on command line 
 		conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
 		conf.set("spark.kyro.registrationRequired", "true");
@@ -398,7 +403,7 @@ public class VCF2TPEDSpark {
 			    new Configuration()
 			);
 		JavaNewHadoopRDD<LongWritable, Text> hadoopRDD = (JavaNewHadoopRDD) javaPairRDD;
-		JavaPairRDD<String, String> union_RDD = hadoopRDD.mapPartitionsWithInputSplit(new ConvertMap(start_chr,end_chr,quality), true).filter(new Filter())
+		JavaPairRDD<String, String> union_RDD = hadoopRDD.mapPartitionsWithInputSplit(new ConvertMap(start_chr,end_chr,quality,genotype_col), true).filter(new Filter())
 				.mapToPair(   																	// .coalesce(ind_num/2) coalesce samll partitions after filter into larger partitions with number = filenum/2
 						new PairFunction<Tuple2<String, String>,String,String>(){
 							@Override
@@ -423,8 +428,8 @@ public class VCF2TPEDSpark {
 //		JavaRDD<String> result_RDD = reduced_sorted_RDD.mapValues(new CombineMap(ind_num*2));  
 //		result_RDD.saveAsTextFile(output_path);
 //		result_RDD.saveAsTextFile(output_path,BZip2Codec.class);
-		long end_time = System.currentTimeMillis();
-		System.out.println("Running Plinkcloud-Spark on "+ind_num+" files took "+(end_time-start_time)/1000+" seconds");
+		
+		
 	}
 
 }

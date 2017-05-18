@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -73,6 +74,7 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 		private Random random;
 		private MultipleOutputs<Text, Text> mos;
 		private String ind_id;
+		private int genotype_col;
 		@Override
 		protected void setup(Context context){
 			Configuration conf = context.getConfiguration();
@@ -87,11 +89,12 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 			FileSplit split = (FileSplit) context.getInputSplit();
 			String fullname = split.getPath().getName();									//get the name of the file where the input split is from		
 			ind_id = fullname.substring(0, fullname.indexOf('.')); 
+			genotype_col = conf.getInt("genotype_col", 0);
 		}
 		
 		@Override 
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
-			TextParser parser = new TextParser(value.toString());	
+			TextParser parser = new TextParser(value.toString(),genotype_col);	
 			Quality qual = parser.getQuality();
 			if(null != qual && qual.compareTo(qual_filter) >= 0){
 				int chrnum = parser.getChrNum();
@@ -178,6 +181,55 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 		
 	}//end of bulk loading mapper
 	
+	protected static class AdditiveBulkLoadingMapper extends Mapper<LongWritable,Text,ImmutableBytesWritable,Put>{
+		private byte[] family = null;
+		private byte[] ref_qualifier = null;
+		private byte[] rs_qualifier = null;
+		private Quality qual_filter;     
+		private TextParser parser;
+		private int startchr;
+		private int endchr;
+		private String ind_id;
+		private int genotype_col;
+		@Override
+		protected void setup(Context context) throws IOException, InterruptedException{ 		//called once at the beginning of a mapper with a single input split 
+			family = Bytes.toBytes("individuals");							//qualifier is individual number
+			ref_qualifier = Bytes.toBytes("ref");
+			rs_qualifier =  Bytes.toBytes("rs");
+			Configuration conf = context.getConfiguration();
+			qual_filter =  Enum.valueOf(Quality.class, conf.get("quality").trim().toUpperCase());
+			parser = new TextParser();
+			startchr = parser.parseChrnum(conf.get("startchr","1"));
+			endchr = parser.parseChrnum(conf.get("endchr","26"));
+			FileSplit split = (FileSplit) context.getInputSplit();
+			String fullname = split.getPath().getName();									//get the name of the file where the input split is from		
+			ind_id = fullname.substring(0, fullname.indexOf('.')); 
+			genotype_col = conf.getInt("genotype_col", 0);
+		}//end of setup
+	
+		@Override
+		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException{
+			TextParser parser = new TextParser(value.toString(),genotype_col);	
+			Quality qual = parser.getQuality();
+			if(null != qual && qual.compareTo(qual_filter) >= 0){
+				int chrnum = parser.getChrNum();
+				if(chrnum >= startchr && chrnum<=endchr ){
+					byte[] individual_qualifier = Bytes.toBytes(ind_id);
+					byte [] rs_pos = Bytes.toBytes(parser.getRs());	 
+					byte [] ref = Bytes.toBytes(parser.getRef());
+					byte [] genotype = Bytes.toBytes(parser.getGenotype());     	// value is the genotype
+					byte [] rowKey = Bytes.toBytes(parser.getRowkey()); //row key is the chrm-genomic pos
+					Put p = new Put(rowKey);
+					p.addColumn(family, individual_qualifier, genotype);
+					p.addColumn(family, ref_qualifier, ref);
+					p.addColumn(family, rs_qualifier, rs_pos);
+					context.write(new ImmutableBytesWritable(rowKey), p);
+				}
+			}
+		}
+		
+	}//end of additive bulk loading mapper
+	
 	protected static class ExportMapper extends TableMapper<NullWritable,Text>{
 		private int file_no;
 		private byte[] family = null;
@@ -188,7 +240,7 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 		@Override
 		protected void setup(Context context){
 			Configuration conf = context.getConfiguration();
-			file_no = Integer.parseInt(conf.get("fileno"));
+			file_no = Integer.parseInt(conf.get("total_fileno"));
 			family = Bytes.toBytes("individuals");							//qualifier is individual number
 			ref_qualifier = Bytes.toBytes("ref");
 			rs_qualifier =  Bytes.toBytes("rs");
@@ -205,8 +257,8 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 			String[] chr_pos = TextParser.parseRowKey(Bytes.toStringBinary(row.get()));
 			result.append(chr_pos[0]+"\t").append(rs).append("\t0\t").append(chr_pos[1]+"\t");
 			for(int i = 1; i<=file_no; i++){
-				if(columns.containsColumn(family, Bytes.toBytes(i)))
-					result.append(Bytes.toString(columns.getValue(family, Bytes.toBytes(i)))+" ");
+				if(columns.containsColumn(family, Bytes.toBytes(String.valueOf(i))))
+					result.append(Bytes.toString(columns.getValue(family, Bytes.toBytes(String.valueOf(i))))+" ");
 				else
 					result.append(ref+" ").append(ref+" ");					
 			}
@@ -279,68 +331,91 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 	@Override
 	public int run(String[] args)throws Exception{
 		int code = 0;
-		Configuration conf = HBaseConfiguration.create(); //get configurations from configuration files on the classpath	
-		Path inputPath = new Path(args[0]); 						// 	VoTECloud/input
-		String outputPath = args[1].trim(); 						// 	base output path  HBase
+		Configuration conf = HBaseConfiguration.create(); //get configurations from configuration files on the classpath
+		CommandLine cmd = commandParser.parseCommands(args, conf);
+		String input = cmd.getOptionValue("i");			//plinkcloud/input/
+		String outputPath = cmd.getOptionValue("o");  	// 	base output path  HBase
+		Path inputPath = new Path(input); 	 						
 		Path sample_outputPath = new Path(outputPath+"/sample"); 	// 	HBase/sample
 		Path result_outputPath = new Path(outputPath+"/results");  	//	HBase/result
 		Path selected_chr_dir = new Path(outputPath+"/sample/"+SELECTED_CHR_DIR); //HBASE/selectedChr
-		double sampleRate = Double.parseDouble(args[2]); //0.0001
-		conf.set("samplerate", ""+sampleRate);	
-		conf.set("fileno", args[3].trim());
-		conf.set("quality", args[4].trim());
-		String chr_range = args[5].trim();
+		double sampleRate = 0.0001;
+		if(cmd.hasOption("r"))
+			sampleRate = Double.parseDouble(cmd.getOptionValue("r")); 
+		conf.set("samplerate", ""+sampleRate);
+		String fileno = cmd.getOptionValue("n");
+		conf.set("fileno", fileno);
+		conf.set("quality", cmd.getOptionValue("q"));
+		int genotype_col = Integer.parseInt(cmd.getOptionValue("g"));
+		conf.setInt("genotype_col", genotype_col);
+		boolean additive = false;
+		if(cmd.hasOption("a")){     //if the merging is additive to the pre-existing table
+			additive = true;
+			conf.set("total_fileno", String.valueOf((Integer.parseInt(cmd.getOptionValue("a"))+Integer.parseInt(fileno))));
+		}else conf.set("total_fileno", fileno);
+		String chr_range = cmd.getOptionValue("c");
 		String start_chr = chr_range.substring(0,chr_range.indexOf("-"));
 		String end_chr = chr_range.substring(chr_range.indexOf("-")+1);
-		boolean ordered = Boolean.valueOf(args[6]);
+		boolean ordered = true;
+		if(cmd.hasOption("s"))
+			ordered = Boolean.parseBoolean(cmd.getOptionValue("s"));
 		conf.set("startchr", start_chr);
 		conf.set("endchr", end_chr);
 		conf.setBoolean("ordered", ordered);
 		String[] row_range = getRowRange(start_chr,end_chr);
-		int region_num = Integer.parseInt(args[3].trim())/2;  //keep each region to hold approximately 3 input file's size data. The region size should around 1G
+		int region_num = Integer.parseInt(cmd.getOptionValue("n"))/2;  //keep each region to hold approximately 3 input file's size data. The region size should around 1G
 		region_num = region_num > 1? region_num : 2;   //if region num 
 		conf.setBoolean("mapreduce.map.speculative", false);
 		conf.setBoolean("mapreduce.reduce.speculative", false);  //turn off the speculative execution
 		conf.setDouble("mapreduce.job.reduce.slowstart.completedmaps", 0.8);  //set the reduce slow start to 50% of completed map tasks cause sampling reducer is very light weight
-		//sample job to get boundaries
-		Job sample_job =  Job.getInstance(conf,"Sample Region Boundaries");
-		sample_job.setJarByClass(getClass());
-		TableMapReduceUtil.addDependencyJars(sample_job);
-		FileInputFormat.addInputPath(sample_job, inputPath);
-		FileOutputFormat.setOutputPath(sample_job,sample_outputPath);
-		sample_job.setMapperClass(VCFSampleMapper.class);
-		sample_job.setReducerClass(VCFSampleReducer.class);
-		sample_job.setOutputKeyClass(Text.class);
-		sample_job.setOutputValueClass(NullWritable.class);
-		sample_job.setNumReduceTasks(1);
-		sample_job.getConfiguration().setBoolean("mapred.compress.map.output", true);
-		sample_job.getConfiguration().setClass("mapred.map.output.compression.codec", Lz4Codec.class, CompressionCodec.class);
-		MultipleOutputs.addNamedOutput(sample_job, "ChrMos",SequenceFileOutputFormat.class, Text.class, Text.class);
-		SequenceFileOutputFormat.setCompressOutput(sample_job, true);
-		SequenceFileOutputFormat.setOutputCompressorClass(sample_job, Lz4Codec.class);
-		SequenceFileOutputFormat.setOutputCompressionType(sample_job, CompressionType.BLOCK);
-		LazyOutputFormat.setOutputFormatClass(sample_job, TextOutputFormat.class);   //if sampling doesn't have any sample, don't create the sample file.
-		code = sample_job.waitForCompletion(true)?0:1;
-		
-		//Create TPED table with predefined boundaries
-		String sample_file = new StringBuilder().append(outputPath)
-				.append("/sample/part-r-00000.lz4").toString();
-		System.out.println("sample_file "+sample_file);
-		List<String> boundaries =  getRegionBoundaries(conf,sample_file,region_num);
 		Connection connection = ConnectionFactory.createConnection(conf);
 		Admin admin = connection.getAdmin();
-		createTable(admin,boundaries);
+		
+		if(!additive){ 						//sample job to get boundaries
+			Job sample_job =  Job.getInstance(conf,"Sample Region Boundaries");
+			sample_job.setJarByClass(getClass());
+			TableMapReduceUtil.addDependencyJars(sample_job);
+			FileInputFormat.addInputPath(sample_job, inputPath);
+			FileOutputFormat.setOutputPath(sample_job,sample_outputPath);
+			sample_job.setMapperClass(VCFSampleMapper.class);
+			sample_job.setReducerClass(VCFSampleReducer.class);
+			sample_job.setOutputKeyClass(Text.class);
+			sample_job.setOutputValueClass(NullWritable.class);
+			sample_job.setNumReduceTasks(1);
+			sample_job.getConfiguration().setBoolean("mapred.compress.map.output", true);
+			sample_job.getConfiguration().setClass("mapred.map.output.compression.codec", Lz4Codec.class, CompressionCodec.class);
+			MultipleOutputs.addNamedOutput(sample_job, "ChrMos",SequenceFileOutputFormat.class, Text.class, Text.class);
+			SequenceFileOutputFormat.setCompressOutput(sample_job, true);
+			SequenceFileOutputFormat.setOutputCompressorClass(sample_job, Lz4Codec.class);
+			SequenceFileOutputFormat.setOutputCompressionType(sample_job, CompressionType.BLOCK);
+			LazyOutputFormat.setOutputFormatClass(sample_job, TextOutputFormat.class);   //if sampling doesn't have any sample, don't create the sample file.
+			code = sample_job.waitForCompletion(true)?0:1;
+		
+			//Create TPED table with predefined boundaries
+			String sample_file = new StringBuilder().append(outputPath)
+					.append("/sample/part-r-00000.lz4").toString();
+			System.out.println("sample_file "+sample_file);
+			List<String> boundaries =  getRegionBoundaries(conf,sample_file,region_num);		
+			createTable(admin,boundaries);
+		}
 		
 		//Bulk Load Job
 		conf.setDouble("mapreduce.job.reduce.slowstart.completedmaps", 0.6);  
 		Job bulk_load_job = Job.getInstance(conf,"Bulk_Load");		 
 		bulk_load_job.setJarByClass(getClass());
 		TableMapReduceUtil.addDependencyJars(bulk_load_job);//distribute the required dependency jars to the cluster nodes. Also need to add the plinkcloud-hbase.jar onto the HADOOP_CLASSPATH in  order for HBase's TableMapReduceUtil to access it. 
-		FileInputFormat.addInputPath(bulk_load_job, selected_chr_dir);
-		bulk_load_job.setInputFormatClass(SequenceFileReadCombiner.class); 
+		if(!additive){
+			FileInputFormat.addInputPath(bulk_load_job, selected_chr_dir);
+			bulk_load_job.setInputFormatClass(SequenceFileReadCombiner.class); 
+		    bulk_load_job.setMapperClass(BulkLoadingMapper.class);
+		}
+		else{
+			FileInputFormat.addInputPath(bulk_load_job, inputPath);
+			bulk_load_job.setMapperClass(AdditiveBulkLoadingMapper.class);
+		}
+		
 	    Path tempPath = new Path("temp/bulk");	    
 	    FileOutputFormat.setOutputPath(bulk_load_job, tempPath);
-	    bulk_load_job.setMapperClass(BulkLoadingMapper.class);
 	    bulk_load_job.setMapOutputKeyClass(ImmutableBytesWritable.class);
 	    bulk_load_job.setMapOutputValueClass(Put.class);
 //	    bulk_load_job.getConfiguration().set(TableOutputFormat.OUTPUT_TABLE, "TPED");
@@ -383,7 +458,7 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 	    
 	}
 	
-	public static void main(String [] args)throws Exception{   //  hadoop jar plinkcloud-hbase.jar org.plinkcloud.hbase.HBaseVCF2TPEDSelectedChr VoTECloud/input/  HBase 0.0001 3 PASS 1-22 true 
+	public static void main(String [] args)throws Exception{   //  hadoop jar plinkcloud-hbase.jar org.plinkcloud.hbase.HBaseVCF2TPEDSelectedChr -i VoTECloud/input/  -o HBase -r 0.0001 -n $1 -q PASS -c 1-26 -s true -g 9 -a 20 
 		//long start_time = System.currentTimeMillis();
 		int exit_code = ToolRunner.run(new HBaseVCF2TPEDSelectedChr(), args);
 		//long end_time = System.currentTimeMillis();
