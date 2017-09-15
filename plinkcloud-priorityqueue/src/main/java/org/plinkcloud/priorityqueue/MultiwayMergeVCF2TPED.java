@@ -428,7 +428,7 @@ public void TPedMerge()  {
 	}
 }//end of TPedMerge
 
-public static void main(String[] args) throws Exception {  //java -jar plinkcloud-priorityqueue.jar -i VCF/ -o Result.tped -c 1-26 -q PASS -s true -g 10
+public static void main(String[] args) throws Exception {  //java -jar plinkcloud-priorityqueue.jar -i VCF/ -o Result.tped -c 1-26 -q PASS -s true -g 9
 	long startTime = System.currentTimeMillis();
 	CommandLine cmd = commandParser.parseCommands(args);
 	String input = cmd.getOptionValue("i");

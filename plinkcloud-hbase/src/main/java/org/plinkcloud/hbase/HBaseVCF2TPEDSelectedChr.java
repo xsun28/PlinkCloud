@@ -458,7 +458,7 @@ public class HBaseVCF2TPEDSelectedChr extends Configured implements Tool{
 	    
 	}
 	
-	public static void main(String [] args)throws Exception{   //  hadoop jar plinkcloud-hbase.jar org.plinkcloud.hbase.HBaseVCF2TPEDSelectedChr -i VoTECloud/input/  -o HBase -r 0.0001 -n $1 -q PASS -c 1-26 -s true -g 9 -a 20 
+	public static void main(String [] args)throws Exception{   //  hadoop jar plinkcloud-hbase.jar org.plinkcloud.hbase.HBaseVCF2TPEDSelectedChr -i plinkcloud/input/  -o HBase -r 0.0001 -n $1 -q PASS -c 1-26 -s true -g 9 -a 20 
 		//long start_time = System.currentTimeMillis();
 		int exit_code = ToolRunner.run(new HBaseVCF2TPEDSelectedChr(), args);
 		//long end_time = System.currentTimeMillis();
