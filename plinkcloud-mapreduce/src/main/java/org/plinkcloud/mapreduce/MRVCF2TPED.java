@@ -43,6 +43,7 @@ import org.apache.hadoop.mapreduce.lib.partition.InputSampler;
 import org.apache.hadoop.mapreduce.lib.partition.TotalOrderPartitioner;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.plinkcloud.mapreduce.common.Quality;
 
 public class MRVCF2TPED extends Configured implements Tool {
 	enum ChrNumCounter{
@@ -60,10 +61,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 		private MultipleOutputs<LongWritable, Text> mos;
 		private long kept = 1;    											//number of kept records for sampling
 		private long records = 0; 											//number of records currently read in the input split
-		private double freq;		
-		private enum Quality {
-					NULL,Q10,Q20,PASS
-		};		
+		private double freq;			
 		private Quality qual_filter;
 		private Random random;
 		private boolean ordered;
@@ -87,37 +85,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 			
 		}//end of setup
 		
-		private Quality getQuality(String line){
-			if(line.startsWith("#")) return null;
-			if(line.contains("PASS")) return Quality.PASS;
-			else if(line.contains("q20")) return Quality.Q10;
-			else if(line.contains("q10")) return Quality.Q20;
-			else return null;
-			
-		}
-		
-		private String parseGenotype(String line){
-			
-			StringBuilder genotype = new StringBuilder();
-			String numbered_genotype = null;//1/0, 1/1...
-			Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
-			String [] fields = line.split("\\s");
-			String genotype_field = fields[genotype_col].trim();
-			String [] alts = fields[4].trim().split(",");
-			String ref = fields[3].trim();
-			Matcher matcher = genotypePattern.matcher(genotype_field);
-			if(matcher.find())
-				numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
-			String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
-			for (int i=0;i<genotype_numbers.length;i++){
-				int number = Integer.parseInt(genotype_numbers[i].trim());
-				if(number==0)
-					genotype.append(ref).append(" ");
-				else
-					genotype.append(alts[number-1]).append(" ");	
-			}
-			return genotype.toString().trim();
-		}
+
 		
 		@Override
 		public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
@@ -125,18 +93,18 @@ public class MRVCF2TPED extends Configured implements Tool {
 			LongWritable outkey = new LongWritable();
 			StringBuilder outputResult = new StringBuilder();
 			String line = value.toString();
-			Quality qual = getQuality(line);
+			Quality qual = common.getQuality(line);
 			if(null != qual && qual.compareTo(qual_filter) >= 0){
 			
 				String[] fields = line.split("\\s+");
 				String chrnum = fields[0].substring(fields[0].indexOf("r")+1).trim();
-				chrm = chrToNum(chrnum);
+				chrm = common.parseChrnum(chrnum);
 				if(chrm >= startchr && chrm <= endchr){         //filter out chrm outside of the chrm range
 					records++;
 					context.getCounter(ChrNumCounter.values()[chrm-1]).increment(1);  //count the chr records num
 					String outputFile;			
 					outputFile = fields[0].trim()+"/part";				//output file for this record  
-					String genotype = parseGenotype(line);
+					String genotype = common.parseGenotype(line,genotype_col);
 					outkey.set(Long.parseLong(fields[1]));
 					boolean sample = false;                             //check if sample this record
 					if(ordered){
@@ -351,23 +319,7 @@ public class MRVCF2TPED extends Configured implements Tool {
 		return orderJob.getConfiguration();
 	}
 	
-	public static int chrToNum(String chr){
-		int chrnum;
-		switch (chr.toLowerCase()) {
-		case "m":
-			chrnum = 26; break;
-		case "xy":
-			chrnum = 25; break;
-		case "x":
-			chrnum = 23; break;
-		case "y":
-			chrnum = 24; break;
-		default:
-			chrnum = Integer.parseInt(chr);
-			break;
-		}
-		return chrnum;
-	}
+
 
 	public int run(String [] args) throws Exception {
 		
@@ -392,8 +344,8 @@ public class MRVCF2TPED extends Configured implements Tool {
 		int index = chrmrange.indexOf("-");
 		String firstchrm = chrmrange.substring(0, index).trim();
 		String lastchrm = chrmrange.substring(index+1).trim();		
-		int first = chrToNum(firstchrm);
-		int last = chrToNum(lastchrm);
+		int first = common.parseChrnum(firstchrm);
+		int last = common.parseChrnum(lastchrm);
 		int chromsno = last-first+1;
 		String defaultName = conf.get("fs.default.name");
 		System.out.println("default "+defaultName);

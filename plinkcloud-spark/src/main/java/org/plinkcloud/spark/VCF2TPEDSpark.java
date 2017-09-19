@@ -22,6 +22,7 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.storage.StorageLevel;
+import org.plinkcloud.spark.common.Quality;
 
 import scala.Tuple2;
 
@@ -225,31 +226,20 @@ public class VCF2TPEDSpark {
 	}
 	public static class ConvertMap implements Function2<InputSplit,  Iterator<Tuple2<LongWritable, Text>>, Iterator<Tuple2<String, String>>>{  //convert the raw row into chr-pos as row key, individual_num,rs,ref,genotypes as value
 		
-		private static final int POS_LENGTH = 10;
-		private static final int CHR_LENGTH = 2;
-		private enum Quality {
-			NULL,Q10,Q20,PASS;	
-		};
+
+
 		
 		Quality quality;
 		private int start_chr, end_chr;
 		private int genotype_col;
 		
 		public ConvertMap(String start, String end, String qual, int genotype_col){
-			start_chr = parseChrnum(start);
-			end_chr = parseChrnum(end);
-			quality = getQuality(qual);
+			start_chr = common.parseChrnum(start);
+			end_chr = common.parseChrnum(end);
+			quality = common.getQuality(qual);
 			this.genotype_col = genotype_col;
 		}
-		
-		private Quality getQuality(String line){
-			if(line.startsWith("#")) return null; // header
-			if(line.contains("PASS")) return Quality.PASS;
-			else if(line.contains("q20")) return Quality.Q10;
-			else if(line.contains("q10")) return Quality.Q20;
-			else return null;
-			
-		}
+
 		
 		@Override
 		public  Iterator<Tuple2<String, String>> call(InputSplit split, final Iterator<Tuple2<LongWritable, Text>> lines ){
@@ -266,20 +256,20 @@ public class VCF2TPEDSpark {
                 public Tuple2<String, String> next() {
                     Tuple2<LongWritable, Text> entry = lines.next();
                     String line = entry._2().toString(); 
-                    Quality qual = getQuality(line);
+                    Quality qual = common.getQuality(line);
         			if(null == qual || qual.compareTo(quality) < 0) 
         				return null;
                     String[] fields = line.split("\\s+");
                     String chrm = fields[0].substring(fields[0].indexOf("r")+1).trim();
-                    int chr_num = parseChrnum(chrm);
+                    int chr_num = common.parseChrnum(chrm);
                     if(chr_num < start_chr || chr_num > end_chr)
         				return null;
-                    String genotype = parseGenotype(line);
+                    String genotype = common.parseGenotype(line,genotype_col);
                     String pos = fields[1].trim();
                     String rs =  fields[2].trim();
                     String ref = fields[3].trim();
                     //String[] alts = fields[4].trim().split(",");
-                    String rowKey = getRowKey(String.valueOf(chr_num),pos);
+                    String rowKey = common.getRowKey(String.valueOf(chr_num),pos);
                     StringBuilder value = new StringBuilder().append(rs+",").append(ref+",")
                     		.append(ind_id+",").append(genotype);
                     return new Tuple2<String, String>(rowKey,value.toString());
@@ -288,50 +278,7 @@ public class VCF2TPEDSpark {
             };		
 		}  //end of call
 		
-		public int parseChrnum(String chr){
-			int chrm;
-			if(chr.equalsIgnoreCase("X")) chrm = 23;
-			else if (chr.equalsIgnoreCase("Y")) chrm = 24;
-			else if (chr.equalsIgnoreCase("XY")) chrm = 25;
-			else if (chr.equalsIgnoreCase("M")) chrm = 26;
-			else chrm = Integer.parseInt(chr);
-			return chrm;
-		}
-		
-		private String parseGenotype(String line){
-			
-			StringBuilder genotype = new StringBuilder();
-			String numbered_genotype = null;//1/0, 1/1...
-			Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
-			String [] fields = line.split("\\s");
-			String genotype_field = fields[genotype_col].trim();
-			String [] alts = fields[4].trim().split(",");
-			String ref = fields[3].trim();
-			Matcher matcher = genotypePattern.matcher(genotype_field);
-			if(matcher.find())
-				numbered_genotype = genotype_field.substring(matcher.start(),matcher.end());
-			String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
-			for (int i=0;i<genotype_numbers.length;i++){
-				int number = Integer.parseInt(genotype_numbers[i].trim());
-				if(number==0)
-					genotype.append(ref).append(" ");
-				else
-					genotype.append(alts[number-1]).append(" ");	
-			}
-			return genotype.toString().trim();
-		}
-		
-		public String getRowKey(String chr, String pos){
-			char[] pos_array = new char[POS_LENGTH];
-			char[] chr_array = new char[CHR_LENGTH];
-			Arrays.fill(pos_array, '0');
-			Arrays.fill(chr_array, '0');
-			int pos_start_offset = POS_LENGTH - pos.length();
-			int chr_start_offset = CHR_LENGTH - chr.length();
-			System.arraycopy(pos.toCharArray(), 0, pos_array, pos_start_offset, pos.length());
-			System.arraycopy(chr.toCharArray(), 0, chr_array, chr_start_offset, chr.length());
-			return  String.valueOf(chr_array)+"-"+ String.valueOf(pos_array);			
-		}
+
 		
 		
 	} //end of ConvertMap
@@ -346,7 +293,7 @@ public class VCF2TPEDSpark {
 		@Override
 		public String call(Tuple2<String,String> input_row){
 			StringBuilder result = new StringBuilder();
-			String[] chr_pos = getChrPos(input_row._1);
+			String[] chr_pos = common.getChrPos(input_row._1);
 			String ref = "", rs;
 			String[] genotypes = new String[total_num];
 			String[] fields = input_row._2.split(",");
@@ -363,16 +310,6 @@ public class VCF2TPEDSpark {
 			return result.toString();
 		}
 		
-		private String[] getChrPos(String line){
-			String chr_pos[] = new String[2];  //row_key[0] = chr, row_key[1] = pos
-			String tmp1 = line.substring(0,line.indexOf("-"));
-			String tmp2 = line.substring(line.indexOf("-")+1);
-			int chr = Integer.parseInt(tmp1);
-			long pos = Long.parseLong(tmp2);
-			chr_pos[0] = String.valueOf(chr);
-			chr_pos[1] = String.valueOf(pos);
-			return chr_pos;
-		}
 
 	}// end of CombineMap
 	

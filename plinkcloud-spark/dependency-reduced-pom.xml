@@ -45,16 +45,20 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.spark</groupId>
-      <artifactId>spark-core_2.10</artifactId>
-      <version>1.6.0</version>
+      <artifactId>spark-core_2.11</artifactId>
+      <version>2.2.0</version>
       <scope>provided</scope>
       <exclusions>
+        <exclusion>
+          <artifactId>avro</artifactId>
+          <groupId>org.apache.avro</groupId>
+        </exclusion>
         <exclusion>
           <artifactId>avro-mapred</artifactId>
           <groupId>org.apache.avro</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>chill_2.10</artifactId>
+          <artifactId>chill_2.11</artifactId>
           <groupId>com.twitter</groupId>
         </exclusion>
         <exclusion>
@@ -70,19 +74,19 @@
           <groupId>org.apache.hadoop</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>spark-launcher_2.10</artifactId>
+          <artifactId>spark-launcher_2.11</artifactId>
           <groupId>org.apache.spark</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>spark-network-common_2.10</artifactId>
+          <artifactId>spark-network-common_2.11</artifactId>
           <groupId>org.apache.spark</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>spark-network-shuffle_2.10</artifactId>
+          <artifactId>spark-network-shuffle_2.11</artifactId>
           <groupId>org.apache.spark</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>spark-unsafe_2.10</artifactId>
+          <artifactId>spark-unsafe_2.11</artifactId>
           <groupId>org.apache.spark</groupId>
         </exclusion>
         <exclusion>
@@ -94,8 +98,8 @@
           <groupId>org.apache.curator</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>javax.servlet</artifactId>
-          <groupId>org.eclipse.jetty.orbit</groupId>
+          <artifactId>javax.servlet-api</artifactId>
+          <groupId>javax.servlet</groupId>
         </exclusion>
         <exclusion>
           <artifactId>commons-lang3</artifactId>
@@ -146,35 +150,39 @@
           <groupId>commons-net</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>akka-remote_2.10</artifactId>
-          <groupId>com.typesafe.akka</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>akka-slf4j_2.10</artifactId>
-          <groupId>com.typesafe.akka</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>scala-library</artifactId>
           <groupId>org.scala-lang</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>json4s-jackson_2.10</artifactId>
+          <artifactId>json4s-jackson_2.11</artifactId>
           <groupId>org.json4s</groupId>
         </exclusion>
         <exclusion>
+          <artifactId>jersey-client</artifactId>
+          <groupId>org.glassfish.jersey.core</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>jersey-common</artifactId>
+          <groupId>org.glassfish.jersey.core</groupId>
+        </exclusion>
+        <exclusion>
           <artifactId>jersey-server</artifactId>
-          <groupId>com.sun.jersey</groupId>
+          <groupId>org.glassfish.jersey.core</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>jersey-core</artifactId>
-          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-container-servlet</artifactId>
+          <groupId>org.glassfish.jersey.containers</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>mesos</artifactId>
-          <groupId>org.apache.mesos</groupId>
+          <artifactId>jersey-container-servlet-core</artifactId>
+          <groupId>org.glassfish.jersey.containers</groupId>
         </exclusion>
         <exclusion>
           <artifactId>netty-all</artifactId>
+          <groupId>io.netty</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>netty</artifactId>
           <groupId>io.netty</groupId>
         </exclusion>
         <exclusion>
@@ -202,7 +210,7 @@
           <groupId>com.fasterxml.jackson.core</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>jackson-module-scala_2.10</artifactId>
+          <artifactId>jackson-module-scala_2.11</artifactId>
           <groupId>com.fasterxml.jackson.module</groupId>
         </exclusion>
         <exclusion>
@@ -214,16 +222,20 @@
           <groupId>oro</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>tachyon-client</artifactId>
-          <groupId>org.tachyonproject</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>pyrolite</artifactId>
           <groupId>net.razorvine</groupId>
         </exclusion>
         <exclusion>
           <artifactId>py4j</artifactId>
           <groupId>net.sf.py4j</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>spark-tags_2.11</artifactId>
+          <groupId>org.apache.spark</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>commons-crypto</artifactId>
+          <groupId>org.apache.commons</groupId>
         </exclusion>
         <exclusion>
           <artifactId>unused</artifactId>

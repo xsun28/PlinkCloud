@@ -1,9 +1,14 @@
 package org.plinkcloud.hbase;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.plinkcloud.hbase.HBaseVCF2TPED.Quality;
+
+import org.plinkcloud.hbase.common.Quality;
+
+
 
 public class TextParser {
 	private static final int POS_LENGTH = 10;
@@ -17,6 +22,11 @@ public class TextParser {
 	private String [] alts;
 	private String rowKey; //row key for HBase row chr_pos;
 	private Quality quality;
+	private Set<Integer> gt_cols_set = new HashSet<>();
+	private String[] genotype_cols;
+	private int gt_col_nums;
+	private StringBuffer outputResult = new StringBuffer();
+	
 	public int parseChrnum(String chr){
 		int chrm;
 		if(chr.equalsIgnoreCase("X")) chrm = 23;
@@ -35,6 +45,7 @@ public class TextParser {
 		else return null;
 		
 	}
+	
 	public String getRowKey(String chr, String pos){
 		char[] pos_array = new char[POS_LENGTH];
 		char[] chr_array = new char[CHR_LENGTH];
@@ -101,6 +112,65 @@ public class TextParser {
 		
 	}
 	
+	public TextParser(String line, String genotype_col){
+		quality = getQuality(line);
+		if(null != quality){
+		String[] fields = line.split("\\s+");
+		genotype_cols = genotype_col.split(",");
+		for(String col: genotype_cols)
+			gt_cols_set.add(Integer.parseInt(col.trim()));
+		gt_col_nums = gt_cols_set.size();
+		chrm = fields[0].substring(fields[0].indexOf("r")+1).trim();
+		chr_num = parseChrnum(chrm);
+		pos = fields[1].trim();
+		rs =  fields[2].trim();
+		ref = fields[3].trim();
+		String alts_str = fields[4].trim();
+		int qual_weights = gt_col_nums; 
+		
+		for(int i=0;i<fields.length;i++){
+			if(gt_cols_set.contains(i)){                				
+				String genotype = parseGenotype(ref,alts_str,fields[i]);
+				outputResult.append(genotype+"\t");             				
+			}else if(i==5){
+				outputResult.append(fields[i].trim()+"|");
+				outputResult.append(qual_weights+"\t");
+			}
+			else outputResult.append(fields[i].trim()+"\t");
+		}
+
+		rowKey = getRowKey(String.valueOf(chr_num),pos);
+		}
+	}
+	
+	public String parseGenotype(String ref, String alt_str, String field){
+		String[] alts = alt_str.trim().split(",");
+		StringBuffer genotype = new StringBuffer();
+		String numbered_genotype = null;//1/0, 1/1...
+		Pattern genotypePattern = Pattern.compile("[\\d]{1}([\\/\\|]{1}[\\d]{1})+");
+//		String genotype_field = fields[genotype_col].trim();
+//		String ref = fields[3].trim();
+		Matcher matcher = genotypePattern.matcher(field);
+		String left="";
+		if(matcher.find()){
+			numbered_genotype = field.substring(matcher.start(),matcher.end());
+			left = field.substring(matcher.end());
+		}
+		
+		String [] genotype_numbers = numbered_genotype.split("[\\/\\|]");
+		for (int i=0;i<genotype_numbers.length;i++){
+			int number = Integer.parseInt(genotype_numbers[i].trim());
+			if(number==0)
+				genotype.append(ref).append("/");
+			else
+				genotype.append(alts[number-1]).append("/");	
+		}
+		String temp = genotype.substring(0, genotype.length()-1);
+		genotype.setLength(0);
+		genotype.append(temp+left);			
+		return genotype.toString().trim();
+	}
+	
 	public String getChr(){
 		return chrm;
 	}
@@ -135,5 +205,9 @@ public class TextParser {
 	
 	public Quality getQuality(){
 		return quality;
+	}
+	
+	public StringBuffer getNewLine(){
+		return outputResult;
 	}
 }

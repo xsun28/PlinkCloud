@@ -50,11 +50,10 @@ import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.plinkcloud.hbase.common.Quality;
 
 public class HBaseVCF2TPED extends Configured implements Tool{
-	protected static enum Quality {
-		Q10,Q20,PASS;	
-	};	
+
 	protected static class VCFSampleMapper extends Mapper<LongWritable,Text,Text,NullWritable>{  // First sampling from each individual file
 		private Quality qual_filter;
 		private double rate;         //sampling rate
