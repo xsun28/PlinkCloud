@@ -1,7 +1,0 @@
-org/plincloud/vcf/simulator/VCFSimulator$StatisticsMapper.class
-org/plincloud/vcf/simulator/VCFSimulator$TotalCounter.class
-org/plincloud/vcf/simulator/VCFSimulator.class
-org/plincloud/vcf/simulator/VCFSimulator$PassCounter.class
-org/plincloud/vcf/simulator/VCFSimulator$MaxCounter.class
-org/plincloud/vcf/simulator/VCFSimulator$Quality.class
-org/plincloud/vcf/simulator/VCFSimulator$SimulationMapper.class
