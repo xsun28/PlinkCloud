@@ -17,6 +17,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.rdd.NewHadoopRDD;
 import org.plinkcloud.spark.common.Quality;
 import scala.Tuple2;
 
@@ -144,8 +145,6 @@ public class VCF2TPEDSparkOneShuffling {
 		}  //end of call		
 	} //end of ConvertMap
 	
-
-
 	
 	public static void main(String[] args) throws Exception {  //spark-submit --class org.plinkcloud.spark.VCF2TPEDSparkOneShuffling --master yarn --deploy-mode cluster --executor-cores 1 --executor-memory 1g --conf spark.network.timeout=10000000 --conf spark.yarn.executor.memoryOverhead=700 --conf spark.shuffle.memoryFraction=0.5 plinkcloud-spark.jar -i plinkcloud/input/ -o Spark/output -n $1 -c 1-26 -q PASS -g 9
 		CommandLine cmd = commandParser.parseCommands(args);
@@ -171,7 +170,8 @@ public class VCF2TPEDSparkOneShuffling {
 			    Text.class, 
 			    new Configuration()
 			);
-		JavaNewHadoopRDD<LongWritable, Text> hadoopRDD = (JavaNewHadoopRDD) javaPairRDD;
+		JavaNewHadoopRDD<LongWritable, Text> hadoopRDD = (JavaNewHadoopRDD<LongWritable, Text>) javaPairRDD;
+
 		JavaPairRDD<String, String> union_RDD = hadoopRDD.mapPartitionsWithInputSplit(new ConvertMap(start_chr,end_chr,quality,genotype_col), true)//.filter(new Filter())
 				.mapToPair(   																	// .coalesce(ind_num/2) coalesce samll partitions after filter into larger partitions with number = filenum/2
 						new PairFunction<Tuple2<String, String>,String,String>(){
@@ -182,11 +182,6 @@ public class VCF2TPEDSparkOneShuffling {
 							}	
 						);
 
-		union_RDD.sortByKey().mapPartitions(new ReduceFunction(ind_num), true).saveAsTextFile(output_path);
-		
-
-		
-		
+		union_RDD.sortByKey().mapPartitions(new ReduceFunction(ind_num), true).saveAsTextFile(output_path);		
 	}
-
 }
