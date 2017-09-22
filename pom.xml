@@ -15,7 +15,6 @@
     <module>plinkcloud-priorityqueue</module>
     <module>plinkcloud-hbase</module>
     <module>plinkcloud-spark</module>
-    <module>plincloud-vcf-simulator</module>
   </modules>
   <properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
