@@ -1,9 +1,11 @@
 # High-efficient Schemas of Distributed Systems for Sorted Merging of Omics Data
-***
+
 Schemas implemented in Java 7 
 for merging multiple VCF files into one VCF file or one TPED file using Apache big-data platforms---MapReduce,HBase and Spark respectively. Source codes can be slightly modified to fit into other types of sorted merging of Omics data.
 
 <br>
+
+---
 
 ## Prerequsites
 
@@ -52,6 +54,8 @@ Node Type | CPU | Memory | Disk
 	
 <br>
 
+---
+
 ## Build Project
 
 1. Download the project
@@ -77,7 +81,10 @@ Node Type | CPU | Memory | Disk
 	```
 	Then compiled jar files can be found in the same locations as step 2.
 	<br>
-	
+	<br>
+	<br>
+
+---	
 
 ## Usage  
 
@@ -279,7 +286,7 @@ Note: all recommend platform configurations and platform-specific options are sa
 		-g 9,10   
 		-a false
 	
-##### 4. Spark schema
+#### 4. Spark schema
 * Command example  
  		
   		$ spark-submit 
