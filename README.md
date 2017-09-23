@@ -86,16 +86,16 @@ Node Type | CPU | Memory | Disk
 [2. Merge VCF files into one VCF file](#vcf-merge)  
 [3. Merge VCF files into one TPED file](#tped-merge)
 
-#### <a name="loading"> </a> Loading Data to HDFS
+### <a name="loading"> </a> Loading Data to HDFS
 	$ cd data_dir/
 	$ hdfs dfs -mkdir -p $input_dir
 	$ hdfs dfs -copyFromLocal *bz2 $input_dir
 
 <br>  
 
-#### <a name="options"></a> Common Command Options  
+### <a name="options"></a> Common Command Options  
   
-The options common to all command scripts (except vcftools-merge.sh): 
+The options common to all command scripts (except vcftools-merge.sh):   
 
  Option|Meaning|Mandatory
  ---|---|---
@@ -108,14 +108,13 @@ The options common to all command scripts (except vcftools-merge.sh):
 
 <br>  
 
-#### <a name="vcf-merge"></a> Merge VCF files into one VCF file
+### <a name="vcf-merge"></a> Merge VCF files into one VCF file
   
 <br>  
 
-##### 1. VCFTools (benchmark)  
+#### 1. VCFTools (benchmark)  
 We provide a Linux script for running VCFTools. You can simply follow the instruction below
 	
-	```
 	$ cd $data_dir/
 	
 	$ cp -p  $project_home_dir/src/main/resources/vcftools-merge.sh .
@@ -124,10 +123,10 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 	
 	$ ./vcftools-merge.sh
 		
-	``` 
-	<br>  
+	 
+<br>  
 	
-##### 2. MapReduce schema
+#### 2. MapReduce schema
 
 * Command example
 		
@@ -157,8 +156,8 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 	
 	Option|Meaning|Mandatory
 	---|---|---
-		**-e** | If first phase already run? | Yes
-		**-r** | First sampling rate | No
+	**-e** | If first phase already run? | Yes
+	**-r** | First sampling rate | No
 	**-s**	| If input data already sorted? | No
 	
 
@@ -229,9 +228,9 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
  <br>
  <br>  
  	
-#### <a name="tped-merge"></a> Merge VCF files into one TPED file 
+### <a name="tped-merge"></a> Merge VCF files into one TPED file 
  
-##### 1. Multiway-merge implementation (benchmark) 
+#### 1. Multiway-merge implementation (benchmark) 
 * Command example
 		
 		$ java -jar plinkcloud-priorityqueue.jar 
@@ -242,7 +241,7 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 			-s true 
 			-g 9	 	
 
-##### 2. MapReduce schema	  
+#### 2. MapReduce schema	  
 Note: all recommend platform configurations and platform-specific options are same (except for -g) as above.   
 
 * Command example
@@ -262,7 +261,7 @@ Note: all recommend platform configurations and platform-specific options are sa
 		-e false
 	Note: the -g option here refers to all genotype columns which might be more than one.
 
-##### 3. HBase schema
+#### 3. HBase schema
 * Command example
 		
 		$ export HBASE_CONF_DIR=/etc/hbase/conf/
