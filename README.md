@@ -14,8 +14,8 @@ Recommended hardware configurations:
  	
 Node Type | CPU | Memory | Disk  
 ---|---|---|---
-**Master**| G Hz| GB| GB|
-**Slave**| G Hz | GB | GB
+**Master**| 2.5G Hz| 15 GB| 200 GB|
+**Slave**| 2.5G Hz | 15 GB | 500 GB
 
 
 
@@ -137,7 +137,7 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 
 * Command example
 		
-			$ hadoop jar plinkcloud-mapreduce.jar 			org.plinkcloud.mapreduce.MRVCF2TPED 
+			$ hadoop jar plinkcloud-mapreduce.jar org.plinkcloud.mapreduce.MRVCF2TPED 
 			-D mapreduce.task.io.sort.mb=600 
 			-D mapreduce.reduce.merge.inmem.threshold=0 
 			-D mapreduce.reduce.input.buffer.percent=1 
@@ -177,15 +177,15 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 		
 		$ export HADOOP_CLASSPATH=./plinkcloud-hbase.jar:$HBASE_CONF_DIR:$(hbase classpath):$HADOOP_CLASSPATH
 			
-		$ hadoop jar plinkcloud-hbase.jar 				org.plinkcloud.hbase.HBaseVCF2TPEDSelectedChr 			-i input/  
-			-o output/ 
-			-r 0.0001 
-			-n 93 
-			-q PASS 
-			-c 1-25 
-			-s true 
-			-g 9   
-			-a false
+		$ hadoop jar plinkcloud-hbase.jar  org.plinkcloud.hbase.HBaseVCF2TPEDSelectedChr 			-i input/  
+		-o output/ 
+		-r 0.0001 
+		-n 93 
+		-q PASS 
+		-c 1-25 
+		-s true 
+		-g 9   
+		-a false
 
 * <a name="hbase-config"></a> Suggested configurations:  
 	See HBase part in [EMR Configuration](https://s3.amazonaws.com/xsun316/plinkcloud/EMRConfig/EMRConfiguration.json)	
@@ -203,7 +203,7 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 	 	  
  * Command
 		
-		$ spark-submit --class 	org.plinkcloud.spark.VCF2TPEDSparkOneShuffling 
+		$ spark-submit --class  org.plinkcloud.spark.VCF2TPEDSparkOneShuffling 
 		--master yarn 
 		--deploy-mode cluster 
 		--executor-cores 1 
