@@ -1,12 +1,12 @@
 # High-efficient Schemas of Distributed Systems for Sorted Merging of Omics Data
-___
+***
 Schemas implemented in Java 7 
 for merging multiple VCF files into one VCF file or one TPED file using Apache big-data platforms---MapReduce,HBase and Spark respectively. Source codes can be slightly modified to fit into other types of sorted merging of Omics data.
 
 <br>
 
 ## Prerequsites
---- 
+***
  
 1. ### Platform Installations
 	* Separate installation   
@@ -32,16 +32,15 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
  5. ### Data Preparation  
  We provide a test dataset of 93 VCF files with encrypted genomic locations. Click [here](https://s3.amazonaws.com/xsun316/encrypted/encrypted.tar.gz) to download.  
  A sample merged result data can be downloaded [here]().  
- Type the following command to unzip downloaded files into 93 bzipped VCF files.     
- 
- 	```
- 	tar xzf encrypted.tar.gz  
+ Type the following command to unzip downloaded files into 93 bzipped VCF files.  
+ 	
+		tar xzf encrypted.tar.gz  
 	
-	```
+	
 <br>
 
 ## Build Project
----
+***
 1. Download the project
 	
 	```
@@ -67,7 +66,8 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 	
 
 ## Usage
----
+***
+
 1.	Merge VCF files into one VCF file  
 	1) VCFTools (Benchmark):
 	
