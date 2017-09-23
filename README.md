@@ -97,14 +97,14 @@ Node Type | CPU | Memory | Disk
   
 The options common to all command scripts (except vcftools-merge.sh):   
 
- Option|Meaning|Mandatory
- ---|---|---
-	**-c** | Chromosomes range | Yes
-	**-g** | Genotype colunm number in input data | Yes
-	**-i** | Input directory on HDFS | Yes
-	**-n** | Input file number | Yes
-	**-o** | Results directory on HDFS | Yes
-	**-q** | Filter symbol | Yes
+Option|Meaning|Mandatory
+---|---|---
+**-c** | Chromosomes range | Yes
+**-g** | Genotype colunm number in input data | Yes
+**-i** | Input directory on HDFS | Yes
+**-n** | Input file number | Yes
+**-o** | Results directory on HDFS | Yes
+**-q** | Filter symbol | Yes
 
 <br>  
 
