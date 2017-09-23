@@ -63,7 +63,7 @@ Node Type | CPU | Memory | Disk
 * A sample merged result data can be downloaded [here]().  
 * Type the following command to unzip downloaded files into 93 bzipped VCF files.  
    		
-		tar xzf encrypted.tar.gz  
+		$ tar xzf encrypted.tar.gz  
 	
 	
 <br>
@@ -75,7 +75,7 @@ Node Type | CPU | Memory | Disk
 1. Download the project
 	
 	```
-	git clone https://github.com/xsun28/PlinkCloud.git
+	$ git clone https://github.com/xsun28/PlinkCloud.git
 	```
 2. If you do not want to rebuild the project and your Java version is 7 or higher, you can directly using the jar files from the following locations in your project home directory :
 		
@@ -108,7 +108,7 @@ Node Type | CPU | Memory | Disk
 [3. Merge VCF files into one TPED file](#tped-merge)
 
 ### <a name="loading"> </a> Loading Data to HDFS
-	$ cd data_dir/
+	$ cd $data_dir/
 	$ hdfs dfs -mkdir -p $input_dir
 	$ hdfs dfs -copyFromLocal *bz2 $input_dir
 
