@@ -91,12 +91,14 @@ Node Type | CPU | Memory | Disk
 	$ hdfs dfs -mkdir -p $input_dir
 	$ hdfs dfs -copyFromLocal *bz2 $input_dir
 
-<br>
+<br>  
+
 #### <a name="options"></a> Common Command Options  
+  
 The options common to all command scripts (except vcftools-merge.sh): 
 
-Option|Meaning|Mandatory
-	---|---|---
+ Option|Meaning|Mandatory
+ ---|---|---
 	**-c** | Chromosomes range | Yes
 	**-g** | Genotype colunm number in input data | Yes
 	**-i** | Input directory on HDFS | Yes
@@ -104,9 +106,12 @@ Option|Meaning|Mandatory
 	**-o** | Results directory on HDFS | Yes
 	**-q** | Filter symbol | Yes
 
-<br>
-#### <a name="vcf-merge"></a> Merge VCF files into one VCF file  
-<br>
+<br>  
+
+#### <a name="vcf-merge"></a> Merge VCF files into one VCF file
+  
+<br>  
+
 ##### 1. VCFTools (benchmark)  
 We provide a Linux script for running VCFTools. You can simply follow the instruction below
 	
@@ -120,7 +125,8 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 	$ ./vcftools-merge.sh
 		
 	``` 
-	<br>
+	<br>  
+	
 ##### 2. MapReduce schema
 
 * Command example
@@ -221,7 +227,8 @@ We provide a Linux script for running VCFTools. You can simply follow the instru
 
 
  <br>
- <br>	
+ <br>  
+ 	
 #### <a name="tped-merge"></a> Merge VCF files into one TPED file 
  
 ##### 1. Multiway-merge implementation (benchmark) 
@@ -293,8 +300,10 @@ Note: all recommend platform configurations and platform-specific options are sa
   		-g 9,10
 	 	
 <br>
-<br>	 	
-## Contact
+<br>  
+	 	
+## Contact  
+
 * _xsun28@emory.edu_	 	
 	 	
 	 	
