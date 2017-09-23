@@ -20,7 +20,21 @@ Node Type | CPU | Memory | Disk
 
 
  
-### 2. Platform Installations  
+### 2. Platform Installations 
+
+* Software Version  
+	The version of platforms we used are:
+	
+	Platform|Version
+	---|---
+	Hadoop | Hadoop-2.7.3
+	HBase | HBase-1.3.0
+	Spark | Spark-2.1.0
+	
+	Note: If you are using different versions of software, please update dependencies in the pom files of corresponding project, and recompile the project.  
+
+
+  
 	
 * Separate installation   
     * [Install Hadoop MapReduce](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/ClusterSetup.html)
