@@ -5,9 +5,10 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 
 <br>
 
-### Prerequsites
----  
-1. ##### Platform Installations
+## Prerequsites
+--- 
+ 
+1. ### Platform Installations
 	* Separate installation   
     	* [Install Hadoop MapReduce](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/ClusterSetup.html)
     	* [Install HBase](http://hbase.apache.org/book.html#getting_started)
@@ -19,14 +20,16 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
     	* [Configure EMR cluster](http://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-configure-apps.html)  
     	We also provide an EMR configuration file used in our test. It can be found as Conf/EMRConfiguration.json  under your project home.  
  <br>
- 2. ##### VCFTools installation
+ 
+ 2. ### VCFTools installation
  	* [Install VCFTools](http://vcftools.sourceforge.net/examples.html)
  	* [Install Tabix](http://www.danielecook.com/installing-tabix-and-samtools-on-mac/)
- 3. ##### [Maven Installation](https://maven.apache.org/install.html)
+ 	
+ 3. ### [Maven Installation](https://maven.apache.org/install.html)
 
- 4. ###### [Git Installation](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+ 4. #### [Git Installation](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
- 5. ##### Data Preparation  
+ 5. ### Data Preparation  
  We provide a test dataset of 93 VCF files with encrypted genomic locations. Click [here](https://s3.amazonaws.com/xsun316/encrypted/encrypted.tar.gz) to download.  
  A sample merged result data can be downloaded [here]().  
  Type the following command to unzip downloaded files into 93 bzipped VCF files.   
@@ -37,7 +40,7 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 	```
 <br>
 
-#### Build Project
+## Build Project
 ---
 1. Download the project
 	
@@ -48,12 +51,12 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 		
 	Schema	| Location
 	---|---
-	Priority-queue |  _plinkcloud-priorityqueue/target/plinkcloud-priorityqueue.jar_
-	MapReduce | _plinkcloud-mapreduce/target/plinkcloud-mapreduce.jar_
-	HBase | _plinkcloud-hbase/target/plinkcloud-hbase.jar_
-	Spark | _plinkcloud-spark/target/plinkcloud-spark.jar_
+	**Priority-queue** |  _plinkcloud-priorityqueue/target/plinkcloud-priorityqueue.jar_
+	**MapReduce** | _plinkcloud-mapreduce/target/plinkcloud-mapreduce.jar_
+	**HBase** | _plinkcloud-hbase/target/plinkcloud-hbase.jar_
+	**Spark** | _plinkcloud-spark/target/plinkcloud-spark.jar_
 
-3. If step 2 is not choosed, you can compile the project from scratch
+3. If step 2 is not chosen, you can compile the project from scratch
 	
 	```
 	cd project_home
@@ -63,7 +66,7 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 	<br>
 	
 
-#### Usage
+## Usage
 ---
 1.	Merge VCF files into one VCF file  
 	1) VCFTools (Benchmark):
