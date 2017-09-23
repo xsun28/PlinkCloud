@@ -60,7 +60,7 @@ Node Type | CPU | Memory | Disk
 ### 6. Data Preparation  
 
 * We provide a test dataset of 93 VCF files with encrypted genomic locations. Click [here](https://s3.amazonaws.com/xsun316/encrypted/encrypted.tar.gz) to download.  
-* A sample merged result data can be downloaded [here]().  
+* A sample merged result data can be downloaded [here](https://s3.amazonaws.com/xsun316/sample_results/result.tar.gz).  
 * Type the following command to unzip downloaded files into 93 bzipped VCF files.  
    		
 		$ tar xzf encrypted.tar.gz  
