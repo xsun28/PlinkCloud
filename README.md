@@ -6,7 +6,7 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 <br>
 
 ## Prerequsites
-***
+
  
 1. ### Platform Installations
 	* Separate installation   
@@ -33,14 +33,14 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
  We provide a test dataset of 93 VCF files with encrypted genomic locations. Click [here](https://s3.amazonaws.com/xsun316/encrypted/encrypted.tar.gz) to download.  
  A sample merged result data can be downloaded [here]().  
  Type the following command to unzip downloaded files into 93 bzipped VCF files.  
- 	
-		tar xzf encrypted.tar.gz  
+ 
+ 		tar xzf encrypted.tar.gz  
 	
 	
 <br>
 
 ## Build Project
-***
+
 1. Download the project
 	
 	```
@@ -66,7 +66,7 @@ for merging multiple VCF files into one VCF file or one TPED file using Apache b
 	
 
 ## Usage
-***
+
 
 1.	Merge VCF files into one VCF file  
 	1) VCFTools (Benchmark):
